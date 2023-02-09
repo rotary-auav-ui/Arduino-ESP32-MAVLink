@@ -1,15 +1,41 @@
 #include "common/mavlink.h"
-#include <HardwareSerial.h>
+// #include <HardwareSerial.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <time.h>
+#include <sys/time.h>
+#include <time.h>
+#include <arpa/inet.h>
+#include <stdbool.h> 
+
 #include <vector>
 #include <array>
+#include <memory>
+
+#define BUFFER_LENGTH 2041
 
 class MAVLink{
-  public : 
+  public :
+    char target_ip[100];
+    int sockfd;
+    struct sockaddr_in gcAddr;
+    struct sockaddr_in locAddr;
+    ssize_t recsize;
+    socklen_t fromlen;
+    int bytes_sent;
+
     uint16_t mis_count;
     std::vector<std::tuple<float, float, float>> waypoints;
 
     // Setup serial communication
-    MAVLink(const int& baud_rate, const uint8_t& rx, const uint8_t& tx);
+    MAVLink(int domain, int type, int protocol);
 
     ~MAVLink();
 
