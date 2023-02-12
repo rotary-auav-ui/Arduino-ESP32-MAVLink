@@ -98,6 +98,7 @@ class MAVLink{
     uint16_t yaw_curr;
     float time_boot_sec;
     bool req_mis;
+    bool armed;
 
     // Check pixhawks current mode
     void check_mode(mavlink_message_t* msg);

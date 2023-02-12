@@ -2,12 +2,16 @@
 
 MAVLink::MAVLink(int domain, int type, int protocol) {
   this->sockfd = socket(domain, type, protocol);
+  if(this->sockfd < 0){
+    printf("Error socket failed\n");
+    exit(0);
+  }
   this->fromlen = sizeof(this->gcAddr);
   strcpy(this->target_ip, "127.0.0.1");
   memset(&this->locAddr, 0, sizeof(this->locAddr));
   this->locAddr.sin_family = AF_INET;
   this->locAddr.sin_addr.s_addr = INADDR_ANY;
-  this->locAddr.sin_port = htons(14551);
+  this->locAddr.sin_port = htons(14550);
   if(bind(this->sockfd, (struct sockaddr*) &locAddr, sizeof(sockaddr))){
     close(this->sockfd);
     exit(0);
@@ -127,9 +131,9 @@ void MAVLink::read_data(){
           // case MAVLINK_MSG_ID_MISSION_ITEM_INT:
           //   this->recv_mission(&msg);
           //   break;
-          // case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
-          //   this->recv_global_pos(&msg);
-          //   break;
+          case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
+            this->recv_global_pos(&msg);
+            break;
         }
       }
     }
@@ -181,31 +185,31 @@ void MAVLink::command_ack(mavlink_message_t* msg){
 void MAVLink::sys_status(mavlink_message_t* msg){
   mavlink_sys_status_t sys_status;
   mavlink_msg_sys_status_decode(msg, &sys_status);
-  printf(
-    "Sensors Present : %u\n\
-    Sensors Enabled : %u\n\
-    Sensors Healthy : %u\n\
-    Load (<1000%): %u %\n\
-    Battery Voltage : %u V\n\
-    Battery Current : %u cA\n\
-    Battery Remaining : %u %\n\
-    Comm Drop Rate : %u c%\n\
-    Comm Errors : %u\n"
-  );
+  // printf(
+  //   "Sensors Present : %u\n\
+  //   Sensors Enabled : %u\n\
+  //   Sensors Healthy : %u\n\
+  //   Load (<1000%): %u %\n\
+  //   Battery Voltage : %u V\n\
+  //   Battery Current : %u cA\n\
+  //   Battery Remaining : %u %\n\
+  //   Comm Drop Rate : %u c%\n\
+  //   Comm Errors : %u\n"
+  // );
 }
 
-// void MAVLink::recv_global_pos(mavlink_message_t* msg){
-//   mavlink_global_position_int_t global_pos;
-//   mavlink_msg_global_position_int_decode(msg, &global_pos);
-//   this->global_pos_curr[0] = static_cast<float>(global_pos.lat / 1e7);
-//   this->global_pos_curr[1] = static_cast<float>(global_pos.lon / 1e7);
-//   this->global_pos_curr[2] = static_cast<float>(global_pos.relative_alt / 1000);
-//   this->velocity_curr[0] = static_cast<float>(global_pos.vx / 100);
-//   this->velocity_curr[1] = static_cast<float>(global_pos.vy / 100);
-//   this->velocity_curr[2] = static_cast<float>(global_pos.vz / 100);
-//   this->time_boot_sec = static_cast<float>(global_pos.time_boot_ms / 1000);
-//   this->yaw_curr = global_pos.hdg;
-// }
+void MAVLink::recv_global_pos(mavlink_message_t* msg){
+  mavlink_global_position_int_t global_pos;
+  mavlink_msg_global_position_int_decode(msg, &global_pos);
+  this->global_pos_curr[0] = static_cast<float>(global_pos.lat / 1e7);
+  this->global_pos_curr[1] = static_cast<float>(global_pos.lon / 1e7);
+  this->global_pos_curr[2] = static_cast<float>(global_pos.relative_alt / 1000);
+  this->velocity_curr[0] = static_cast<float>(global_pos.vx / 100);
+  this->velocity_curr[1] = static_cast<float>(global_pos.vy / 100);
+  this->velocity_curr[2] = static_cast<float>(global_pos.vz / 100);
+  this->time_boot_sec = static_cast<float>(global_pos.time_boot_ms / 1000);
+  this->yaw_curr = global_pos.hdg;
+}
 
 // void MAVLink::current_mission_status(mavlink_message_t* msg){
 //   mavlink_mission_current_t mis_stat;
@@ -304,16 +308,12 @@ void MAVLink::arm_disarm(bool arm){
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->gcAddr, sizeof(struct sockaddr_in));
+
+  while(this->px_mode != MAV_MODE_FLAG_SAFETY_ARMED);
 }
 
 void MAVLink::takeoff(const float& height){
-  if(this->px_mode != MAV_MODE_FLAG_SAFETY_ARMED){
-    this->arm_disarm(true);
-  }
-
-  if(this->px_mode != MAV_MODE_FLAG_AUTO_ENABLED){
-    this->set_mode(MAV_MODE_AUTO_ARMED);
-  }
+  this->arm_disarm(true);
 
   printf("Taking off\n");
   mavlink_message_t msg;
@@ -337,6 +337,10 @@ void MAVLink::takeoff(const float& height){
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->gcAddr, sizeof(struct sockaddr_in));
+
+  while(std::abs(global_pos_curr[2] - height) > 0.3);
+
+  printf("Takeoff height reached\n");
 }
 
 // void MAVLink::land(){
