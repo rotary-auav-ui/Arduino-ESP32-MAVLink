@@ -25,8 +25,8 @@ class MAVLink{
   public :
     char target_ip[100];
     int sockfd;
-    struct sockaddr_in gcAddr;
-    struct sockaddr_in locAddr;
+    struct sockaddr_in destAddr;
+    struct sockaddr_in addr;
     ssize_t recsize;
     socklen_t fromlen;
     int bytes_sent;

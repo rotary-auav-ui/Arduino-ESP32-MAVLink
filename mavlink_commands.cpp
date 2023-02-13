@@ -6,13 +6,13 @@ MAVLink::MAVLink(int domain, int type, int protocol) {
     printf("Error socket failed\n");
     exit(0);
   }
-  this->fromlen = sizeof(this->gcAddr);
   strcpy(this->target_ip, "127.0.0.1");
-  memset(&this->locAddr, 0, sizeof(this->locAddr));
-  this->locAddr.sin_family = AF_INET;
-  this->locAddr.sin_addr.s_addr = INADDR_ANY;
-  this->locAddr.sin_port = htons(14550);
-  if(bind(this->sockfd, (struct sockaddr*) &locAddr, sizeof(sockaddr))){
+  memset(&this->addr, 0, sizeof(this->addr));
+  this->addr.sin_family = AF_INET;
+  // this->addr.sin_addr.s_addr = INADDR_ANY;
+  inet_pton(AF_INET, "127.0.0.1", &(this->addr.sin_addr));
+  this->addr.sin_port = htons(14540);
+  if(bind(this->sockfd, (struct sockaddr*) &addr, sizeof(sockaddr)) != 0){
     close(this->sockfd);
     exit(0);
   }
@@ -20,10 +20,16 @@ MAVLink::MAVLink(int domain, int type, int protocol) {
     close(this->sockfd);
     exit(0);
   }
-	memset(&this->gcAddr, 0, sizeof(this->gcAddr));
-	this->gcAddr.sin_family = AF_INET;
-	this->gcAddr.sin_addr.s_addr = inet_addr(this->target_ip);
-	this->gcAddr.sin_port = htons(14550);
+	memset(&this->destAddr, 0, sizeof(this->destAddr));
+	this->destAddr.sin_family = AF_INET;
+	// this->destAddr.sin_addr.s_addr = inet_addr(this->target_ip);
+  inet_pton(AF_INET, "127.0.0.1", &destAddr.sin_addr.s_addr);
+	this->destAddr.sin_port = htons(14550);
+  this->fromlen = sizeof(this->destAddr);
+  // if(bind(this->sockfd, (struct sockaddr *) &this->destAddr, sizeof(struct sockaddr))){
+  //   close(this->sockfd);
+  //   exit(0);
+  // }
 }
 
 MAVLink::~MAVLink() {}
@@ -84,7 +90,7 @@ void MAVLink::req_data_stream(){
   );
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
   
-  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->gcAddr, sizeof(struct sockaddr_in));
+  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 }
 
 void MAVLink::read_data(){
@@ -93,7 +99,7 @@ void MAVLink::read_data(){
   uint8_t buf[BUFFER_LENGTH];
 
   memset(buf, 0, BUFFER_LENGTH);
-  this->recsize = recvfrom(this->sockfd, (void*) buf, BUFFER_LENGTH, 0, (struct sockaddr *)&this->gcAddr, &this->fromlen);
+  this->recsize = recvfrom(this->sockfd, (void*) buf, BUFFER_LENGTH, 0, (struct sockaddr *)&this->destAddr, &this->fromlen);
   if(recsize > 0)
   {
     //Get new message
@@ -279,7 +285,7 @@ void MAVLink::run_prearm_checks(){
   );
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
-  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->gcAddr, sizeof(struct sockaddr_in));
+  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 }
 
 void MAVLink::arm_disarm(bool arm){
@@ -307,9 +313,10 @@ void MAVLink::arm_disarm(bool arm){
   );
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
-  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->gcAddr, sizeof(struct sockaddr_in));
+  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 
-  while(this->px_mode != MAV_MODE_FLAG_SAFETY_ARMED);
+  // while(this->px_mode != 157);
+  sleep(2);
 }
 
 void MAVLink::takeoff(const float& height){
@@ -336,7 +343,7 @@ void MAVLink::takeoff(const float& height){
   );
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
-  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->gcAddr, sizeof(struct sockaddr_in));
+  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 
   while(std::abs(global_pos_curr[2] - height) > 0.3);
 
@@ -390,7 +397,7 @@ void MAVLink::set_mode(const uint16_t& mode){
   );
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
   
-  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->gcAddr, sizeof(struct sockaddr_in));
+  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 }
 
 // void MAVLink::return_to_launch(){
