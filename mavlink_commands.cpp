@@ -162,13 +162,18 @@ void MAVLink::command_ack(mavlink_message_t* msg){
 }
 
 void MAVLink::mission_request(mavlink_message_t* msg){
-  mavlink_mission_request_int_t mis_req;
-  mavlink_msg_mission_request_int_decode(msg, &mis_req);
-  this->mis_seq = mis_req.seq;
-  this->tgt_sys = mis_req.target_system;
-  this->tgt_comp = mis_req.target_component;
-  printf("Requesting for mission type %u sequence %u\n", mis_req.mission_type, this->mis_seq);
-  this->send_mission_item();
+  if(this->mis_seq == 0) this->takeoff(5);
+  else if(this->mis_seq == this->mis_count - 2) this->return_to_launch();
+  else if(this->mis_seq == this->mis_count - 1) this->land();
+  else{
+    mavlink_mission_request_int_t mis_req;
+    mavlink_msg_mission_request_int_decode(msg, &mis_req);
+    this->mis_seq = mis_req.seq;
+    this->tgt_sys = mis_req.target_system;
+    this->tgt_comp = mis_req.target_component;
+    printf("Requesting for mission type %u sequence %u\n", mis_req.mission_type, this->mis_seq);
+    this->send_mission_item();
+  }
 }
 
 void MAVLink::check_mission_progress(mavlink_message_t* msg){
@@ -433,11 +438,12 @@ void MAVLink::return_to_launch(){
 }
 
 void MAVLink::send_mission_count(const uint16_t& num_of_mission){
+  this->mis_count = num_of_mission + 3;
+
   printf("Sending mission count: %u\n", num_of_mission);
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MSG_ID_MISSION_COUNT_LEN];
 
-  this->mis_count = num_of_mission;
   this->mis_seq = 0;
 
   mavlink_msg_mission_count_pack(
@@ -446,7 +452,7 @@ void MAVLink::send_mission_count(const uint16_t& num_of_mission){
     &msg, 
     this->tgt_sys, 
     this->tgt_comp, 
-    num_of_mission, 
+    this->mis_count, 
     MAV_MISSION_TYPE_MISSION
   );
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
