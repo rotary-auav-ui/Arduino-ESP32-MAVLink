@@ -320,14 +320,12 @@ void MAVLink::arm_disarm(bool arm){
 
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 
-  // while(this->px_mode != 157);
-  // sleep(2);
+  while(this->px_mode < 128);
+
+  this->armed = true;
 }
 
 void MAVLink::takeoff(const float& height){
-
-  this->arm_disarm(true);
-
   printf("Taking off\n");
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
@@ -350,6 +348,10 @@ void MAVLink::takeoff(const float& height){
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
+
+  this->arm_disarm(true);
+
+  this->set_mode(MAV_MODE_AUTO_ARMED);
 
   // while(std::abs(global_pos_curr[2] - height) > 0.3);
 
