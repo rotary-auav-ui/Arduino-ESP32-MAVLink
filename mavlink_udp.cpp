@@ -19,13 +19,13 @@ int main(int argc, char const *argv[])
 
     std::thread t1(rd, 1);
 
-    mavlink->arm_disarm(true);
+    // mavlink->arm_disarm(true);
 
-    // mavlink->waypoints.push_back(std::make_tuple(473.977514, 85.456074, 5));
+    mavlink->waypoints.push_back(std::make_tuple(473.977514, 85.456074, 5));
 
-    // mavlink->waypoints.push_back(std::make_tuple(473.977514, 85.456081, 5));
+    mavlink->waypoints.push_back(std::make_tuple(473.977514, 85.456081, 5));
 
-    // mavlink->send_mission_count(1);
+    mavlink->send_mission_count(1);
 
     // sleep(3);
 
