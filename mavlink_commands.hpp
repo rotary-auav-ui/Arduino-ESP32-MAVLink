@@ -101,34 +101,37 @@ class MAVLink{
     bool armed;
 
     // Check pixhawks current mode
-    void check_mode(mavlink_message_t* msg);
+    void parse_heartbeat(mavlink_message_t* msg);
 
-    // Accept a mission request and send a mission item
-    void mission_request(mavlink_message_t* msg);
+    // Accept a mission request (int32) and send a mission item
+    void parse_mission_request_int(mavlink_message_t* msg);
+
+    // Accept a mission reqeuest (float) and send a mission item
+    void parse_mission_request(mavlink_message_t* msg);
 
     // Check mission items reached
-    void check_mission_progress(mavlink_message_t* msg);
+    void parse_mission_progress(mavlink_message_t* msg);
 
     // Check whether uploaded mission is accepted
-    void uploaded_mission_status(mavlink_message_t* msg);
+    void parse_mission_ack(mavlink_message_t* msg);
 
     // Check whether command was successfuly accepted
-    void command_ack(mavlink_message_t* msg);
+    void parse_command_ack(mavlink_message_t* msg);
 
     // Results of prearm checks
-    void sys_status(mavlink_message_t* msg);
+    void parse_sys_status(mavlink_message_t* msg);
 
     // Receive current global pos and velocity
-    void recv_global_pos(mavlink_message_t * msg);
+    void parse_global_pos(mavlink_message_t * msg);
 
     // Status of currently run mission
-    void current_mission_status(mavlink_message_t* msg);
+    void parse_mission_status(mavlink_message_t* msg);
 
     // Get downloaded mission count
-    void recv_mission_count(mavlink_message_t* msg);
+    void parse_mission_count(mavlink_message_t* msg);
 
     // Get downloaded missions
-    void recv_mission(mavlink_message_t* msg);
+    void parse_mission_item(mavlink_message_t* msg);
 
     // Run pre-arm checks
     void run_prearm_checks();

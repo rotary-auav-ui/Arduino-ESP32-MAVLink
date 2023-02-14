@@ -64,7 +64,7 @@ void MAVLink::req_data_stream(){
   this->sys_id = 255;
   this->comp_id = 2;
   this->tgt_sys = 1;
-  this->tgt_comp = 1;
+  this->tgt_comp = 0;
   uint8_t req_stream_id = MAV_DATA_STREAM_ALL;
   uint16_t req_msg_rate = 0x01; // 1 times per second
   uint8_t start_stop = 1; // 1 start, 0 = stop
@@ -105,34 +105,37 @@ void MAVLink::read_data(){
         switch(msg.msgid)
         {
           case MAVLINK_MSG_ID_HEARTBEAT:
-            this->check_mode(&msg);
+            this->parse_heartbeat(&msg);
             break;
           case MAVLINK_MSG_ID_MISSION_REQUEST_INT:
-            this->mission_request(&msg);
+            this->parse_mission_request_int(&msg);
+            break;
+          case MAVLINK_MSG_ID_MISSION_REQUEST:
+            this->parse_mission_request(&msg);
             break;
           case MAVLINK_MSG_ID_MISSION_ACK:
-            this->uploaded_mission_status(&msg);
+            this->parse_mission_ack(&msg);
             break;
           case MAVLINK_MSG_ID_MISSION_ITEM_REACHED:
-            this->check_mission_progress(&msg);
+            this->parse_mission_progress(&msg);
             break;
           case MAVLINK_MSG_ID_COMMAND_ACK:
-            this->command_ack(&msg);
+            this->parse_command_ack(&msg);
             break;
           case MAVLINK_MSG_ID_SYS_STATUS:
-            this->sys_status(&msg);
+            this->parse_sys_status(&msg);
             break;
           case MAVLINK_MSG_ID_MISSION_CURRENT:
-            this->current_mission_status(&msg);
+            this->parse_mission_status(&msg);
             break;
           case MAVLINK_MSG_ID_MISSION_COUNT:
-            this->recv_mission_count(&msg);
+            this->parse_mission_count(&msg);
             break;
           case MAVLINK_MSG_ID_MISSION_ITEM_INT:
-            this->recv_mission(&msg);
+            this->parse_mission_item(&msg);
             break;
           case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
-            this->recv_global_pos(&msg);
+            this->parse_global_pos(&msg);
             break;
         }
       }
@@ -141,7 +144,7 @@ void MAVLink::read_data(){
   memset(buf, 0, BUFFER_LENGTH);
 }
 
-void MAVLink::check_mode(mavlink_message_t* msg){
+void MAVLink::parse_heartbeat(mavlink_message_t* msg){
   mavlink_heartbeat_t hb;
   mavlink_msg_heartbeat_decode(msg, &hb);
   this->px_mode = hb.base_mode;
@@ -149,13 +152,13 @@ void MAVLink::check_mode(mavlink_message_t* msg){
   printf("Heartbeat detected\nMode : %u\nSystem : %u\n", this->px_mode, this->px_status);
 }
 
-void MAVLink::command_ack(mavlink_message_t* msg){
+void MAVLink::parse_command_ack(mavlink_message_t* msg){
   mavlink_command_ack_t cmd_ack;
   mavlink_msg_command_ack_decode(msg, &cmd_ack);
   printf("Command %u result code %u\n", cmd_ack.command, cmd_ack.result);
 }
 
-void MAVLink::mission_request(mavlink_message_t* msg){
+void MAVLink::parse_mission_request_int(mavlink_message_t* msg){
   mavlink_mission_request_int_t mis_req;
   mavlink_msg_mission_request_int_decode(msg, &mis_req);
   this->mis_seq = mis_req.seq;
@@ -170,13 +173,28 @@ void MAVLink::mission_request(mavlink_message_t* msg){
   }
 }
 
-void MAVLink::check_mission_progress(mavlink_message_t* msg){
+void MAVLink::parse_mission_request(mavlink_message_t* msg){
+  mavlink_mission_request_t mis_req;
+  mavlink_msg_mission_request_decode(msg, &mis_req);
+  this->mis_seq = mis_req.seq;
+  this->tgt_sys = mis_req.target_system;
+  this->tgt_comp = mis_req.target_component;
+  printf("Requesting for mission type %u sequence %u\n", mis_req.mission_type, this->mis_seq);
+  if(this->mis_seq == 0) this->takeoff(5);
+  else if(this->mis_seq == this->mis_count - 2) this->return_to_launch();
+  else if(this->mis_seq == this->mis_count - 1) this->land();
+  else{
+    this->send_mission_item();
+  }
+}
+
+void MAVLink::parse_mission_progress(mavlink_message_t* msg){
   mavlink_mission_item_reached_t it;
   mavlink_msg_mission_item_reached_decode(msg, &it);
   printf("Mission sequence %u reached\n", it.seq);
 }
 
-void MAVLink::uploaded_mission_status(mavlink_message_t* msg){
+void MAVLink::parse_mission_ack(mavlink_message_t* msg){
   mavlink_mission_ack_t mis_ack;
   mavlink_msg_mission_ack_decode(msg, &mis_ack);
   if(mis_ack.type == MAV_MISSION_ACCEPTED){
@@ -187,7 +205,7 @@ void MAVLink::uploaded_mission_status(mavlink_message_t* msg){
   }
 }
 
-void MAVLink::sys_status(mavlink_message_t* msg){
+void MAVLink::parse_sys_status(mavlink_message_t* msg){
   mavlink_sys_status_t sys_status;
   mavlink_msg_sys_status_decode(msg, &sys_status);
   // printf(
@@ -203,7 +221,7 @@ void MAVLink::sys_status(mavlink_message_t* msg){
   // );
 }
 
-void MAVLink::recv_global_pos(mavlink_message_t* msg){
+void MAVLink::parse_global_pos(mavlink_message_t* msg){
   mavlink_global_position_int_t global_pos;
   mavlink_msg_global_position_int_decode(msg, &global_pos);
   this->global_pos_curr[0] = static_cast<float>(global_pos.lat / 1e7);
@@ -216,7 +234,7 @@ void MAVLink::recv_global_pos(mavlink_message_t* msg){
   this->yaw_curr = global_pos.hdg;
 }
 
-void MAVLink::current_mission_status(mavlink_message_t* msg){
+void MAVLink::parse_mission_status(mavlink_message_t* msg){
   mavlink_mission_current_t mis_stat;
   mavlink_msg_mission_current_decode(msg, &mis_stat);
   switch (mis_stat.mission_state){
@@ -242,7 +260,7 @@ void MAVLink::current_mission_status(mavlink_message_t* msg){
   }
 }
 
-void MAVLink::recv_mission_count(mavlink_message_t* msg){
+void MAVLink::parse_mission_count(mavlink_message_t* msg){
   mavlink_mission_count_t recv_mis_count;
   mavlink_msg_mission_count_decode(msg, &recv_mis_count);
   if(recv_mis_count.count != this->mis_count){
@@ -253,7 +271,7 @@ void MAVLink::recv_mission_count(mavlink_message_t* msg){
   }
 }
 
-void MAVLink::recv_mission(mavlink_message_t* msg){
+void MAVLink::parse_mission_item(mavlink_message_t* msg){
   mavlink_mission_item_int_t recv_mis;
   mavlink_msg_mission_item_int_decode(msg, &recv_mis);
   printf("Downloaded waypoint %u with lat %f, long %f, and height %f\n", recv_mis.seq, recv_mis.x / 1e7, recv_mis.y / 1e7, recv_mis.z);
@@ -267,7 +285,7 @@ void MAVLink::run_prearm_checks(){
   printf("Running prearm checks\n");
 
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
   uint16_t command = 401;
   uint8_t conf = 0;
@@ -293,7 +311,7 @@ void MAVLink::arm_disarm(bool arm){
   if(arm) printf("Arming\n"); else printf("Disarming\n");
   
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
   uint16_t command = 400; //arm disarm
   uint8_t conf = 0;
@@ -322,7 +340,7 @@ void MAVLink::arm_disarm(bool arm){
 void MAVLink::takeoff(const float& height){
   printf("Takeoff waypoint sent\n");
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_MISSION_ITEM_INT_LEN];
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
   uint16_t command = 22; //takeoff
   uint8_t conf = 0;
@@ -351,7 +369,7 @@ void MAVLink::takeoff(const float& height){
 void MAVLink::land(){
   printf("Landing waypoint sent\n");
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_MISSION_ITEM_INT_LEN];
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
   uint16_t command = 21; //land
 
@@ -377,7 +395,7 @@ void MAVLink::land(){
 void MAVLink::set_mode(const uint16_t& mode){
   printf("Setting mode to %u", mode);
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
   uint16_t command = 176; //do set mode
   uint8_t conf = 0;
@@ -403,7 +421,7 @@ void MAVLink::return_to_launch(){
   printf("Returning to launch waypoint sent\n");
 
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_MISSION_ITEM_INT_LEN];
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
   uint16_t command = 20; //return to launch
 
@@ -431,7 +449,7 @@ void MAVLink::send_mission_count(const uint16_t& num_of_mission){
 
   printf("Sending mission count: %u\n", num_of_mission);
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_MISSION_COUNT_LEN];
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
   this->mis_seq = 0;
 
@@ -455,7 +473,7 @@ void MAVLink::send_mission_item(){
   float hgt = std::get<2>(this->waypoints.at(this->mis_seq));
   printf("Setting waypoint lat : %f, lng : %f, height : %f\n", lat, lng, hgt);
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_MISSION_ITEM_INT_LEN];
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
   uint8_t frame = MAV_FRAME_GLOBAL_RELATIVE_ALT; //lat, long, altitude is relative to home altitude in meters
   uint8_t command = 16; //waypoint
@@ -499,7 +517,7 @@ void MAVLink::send_mission_item(){
 void MAVLink::req_mission_list(){
   printf("Downloading mission from pixhawk\n");
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_MISSION_REQUEST_LIST_LEN];
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
   this->mis_seq = 0;
 
@@ -520,7 +538,7 @@ void MAVLink::req_mission_list(){
 void MAVLink::req_mission_item(){
   printf("Requesting mission item\n");
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_MISSION_REQUEST_INT_LEN];
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
   mavlink_msg_mission_request_int_pack(
     this->sys_id,
@@ -542,7 +560,7 @@ void MAVLink::req_mission_item(){
 void MAVLink::send_mission_ack(){
   printf("Mission downloading finished\n");
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_MISSION_ACK_LEN];
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
   // TODO : Better error handling here
   mavlink_msg_mission_ack_pack(
