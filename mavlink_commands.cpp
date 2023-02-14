@@ -6,19 +6,19 @@ MAVLink::MAVLink(int domain, int type, int protocol) {
     printf("Error socket failed\n");
     exit(0);
   }
-  strcpy(this->target_ip, "127.0.0.1");
-  memset(&this->addr, 0, sizeof(this->addr));
-  this->addr.sin_family = AF_INET;
-  inet_pton(AF_INET, "127.0.0.1", &(this->addr.sin_addr));
-  this->addr.sin_port = htons(14540);
-  if(bind(this->sockfd, (struct sockaddr*) &addr, sizeof(sockaddr)) != 0){
-    close(this->sockfd);
-    exit(0);
-  }
-  if(fcntl(this->sockfd, F_SETFL, O_NONBLOCK | O_ASYNC) < 0){
-    close(this->sockfd);
-    exit(0);
-  }
+  // strcpy(this->target_ip, "127.0.0.1");
+  // memset(&this->addr, 0, sizeof(this->addr));
+  // this->addr.sin_family = AF_INET;
+  // inet_pton(AF_INET, "127.0.0.1", &(this->addr.sin_addr));
+  // this->addr.sin_port = htons(14540);
+  // if(bind(this->sockfd, (struct sockaddr*) &addr, sizeof(sockaddr)) != 0){
+  //   close(this->sockfd);
+  //   exit(0);
+  // }
+  // if(fcntl(this->sockfd, F_SETFL, O_NONBLOCK | O_ASYNC) < 0){
+  //   close(this->sockfd);
+  //   exit(0);
+  // }
 	memset(&this->destAddr, 0, sizeof(this->destAddr));
 	this->destAddr.sin_family = AF_INET;
   inet_pton(AF_INET, "127.0.0.1", &destAddr.sin_addr.s_addr);
@@ -364,6 +364,8 @@ void MAVLink::takeoff(const float& height){
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
+  
+  this->mis_seq++;
 }
 
 void MAVLink::land(){
@@ -390,6 +392,8 @@ void MAVLink::land(){
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
+
+  this->mis_seq++;
 }
 
 void MAVLink::set_mode(const uint16_t& mode){
@@ -442,6 +446,8 @@ void MAVLink::return_to_launch(){
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
+
+  this->mis_seq++;
 }
 
 void MAVLink::send_mission_count(const uint16_t& num_of_mission){
@@ -512,6 +518,8 @@ void MAVLink::send_mission_item(){
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 
   printf("Mission sequence %u sent", this->mis_seq);
+
+  this->mis_seq++;
 }
 
 void MAVLink::req_mission_list(){
