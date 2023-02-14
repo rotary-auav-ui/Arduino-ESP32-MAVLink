@@ -9,7 +9,6 @@ MAVLink::MAVLink(int domain, int type, int protocol) {
   strcpy(this->target_ip, "127.0.0.1");
   memset(&this->addr, 0, sizeof(this->addr));
   this->addr.sin_family = AF_INET;
-  // this->addr.sin_addr.s_addr = INADDR_ANY;
   inet_pton(AF_INET, "127.0.0.1", &(this->addr.sin_addr));
   this->addr.sin_port = htons(14540);
   if(bind(this->sockfd, (struct sockaddr*) &addr, sizeof(sockaddr)) != 0){
@@ -22,14 +21,9 @@ MAVLink::MAVLink(int domain, int type, int protocol) {
   }
 	memset(&this->destAddr, 0, sizeof(this->destAddr));
 	this->destAddr.sin_family = AF_INET;
-	// this->destAddr.sin_addr.s_addr = inet_addr(this->target_ip);
   inet_pton(AF_INET, "127.0.0.1", &destAddr.sin_addr.s_addr);
 	this->destAddr.sin_port = htons(18570);
   this->fromlen = sizeof(this->destAddr);
-  // if(bind(this->sockfd, (struct sockaddr *) &this->destAddr, sizeof(struct sockaddr))){
-  //   close(this->sockfd);
-  //   exit(0);
-  // }
 }
 
 MAVLink::~MAVLink() {}
@@ -162,16 +156,16 @@ void MAVLink::command_ack(mavlink_message_t* msg){
 }
 
 void MAVLink::mission_request(mavlink_message_t* msg){
+  mavlink_mission_request_int_t mis_req;
+  mavlink_msg_mission_request_int_decode(msg, &mis_req);
+  this->mis_seq = mis_req.seq;
+  this->tgt_sys = mis_req.target_system;
+  this->tgt_comp = mis_req.target_component;
+  printf("Requesting for mission type %u sequence %u\n", mis_req.mission_type, this->mis_seq);
   if(this->mis_seq == 0) this->takeoff(5);
   else if(this->mis_seq == this->mis_count - 2) this->return_to_launch();
   else if(this->mis_seq == this->mis_count - 1) this->land();
   else{
-    mavlink_mission_request_int_t mis_req;
-    mavlink_msg_mission_request_int_decode(msg, &mis_req);
-    this->mis_seq = mis_req.seq;
-    this->tgt_sys = mis_req.target_system;
-    this->tgt_comp = mis_req.target_component;
-    printf("Requesting for mission type %u sequence %u\n", mis_req.mission_type, this->mis_seq);
     this->send_mission_item();
   }
 }
@@ -326,64 +320,54 @@ void MAVLink::arm_disarm(bool arm){
 }
 
 void MAVLink::takeoff(const float& height){
-  printf("Taking off\n");
+  printf("Takeoff waypoint sent\n");
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+  uint8_t buf[MAVLINK_MSG_ID_MISSION_ITEM_INT_LEN];
 
   uint16_t command = 22; //takeoff
   uint8_t conf = 0;
   float param7 = height;
 
-  mavlink_msg_command_long_pack(
+  mavlink_msg_mission_item_int_pack(
     this->sys_id, 
-    this->comp_id, 
+    this->comp_id,
     &msg, 
     this->tgt_sys, 
-    this->tgt_comp, 
-    command, 
-    conf, 
+    this->tgt_comp,
+    this->mis_seq,
+    MAV_FRAME_GLOBAL_RELATIVE_ALT_INT, 
+    command,
+    0,
+    1,  
     0, 0, 0, 0, 0, 0, 
-    param7
+    param7,
+    MAV_MISSION_TYPE_MISSION
   );
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
-
-  this->arm_disarm(true);
-
-  this->set_mode(MAV_MODE_AUTO_ARMED);
-
-  // while(std::abs(global_pos_curr[2] - height) > 0.3);
-
-  // printf("Takeoff height reached\n");
-
-  // this->set_mode(MAV_MODE_AUTO_ARMED);
-
-  // sleep(5);
-
-  // this->arm_disarm(true);
-
-  // this->set_mode(MAV_MODE_AUTO_ARMED);
-
 }
 
 void MAVLink::land(){
-  printf("Landing\n");
+  printf("Landing waypoint sent\n");
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+  uint8_t buf[MAVLINK_MSG_ID_MISSION_ITEM_INT_LEN];
 
   uint16_t command = 21; //land
-  uint8_t conf = 0;
 
-  mavlink_msg_command_long_pack(
+  mavlink_msg_mission_item_int_pack(
     this->sys_id, 
-    this->comp_id, 
+    this->comp_id,
     &msg, 
     this->tgt_sys, 
-    this->tgt_comp, 
-    command, 
-    conf, 
-    0, 0, 0, 0, 0, 0, 0
+    this->tgt_comp,
+    this->mis_seq,
+    MAV_FRAME_GLOBAL_RELATIVE_ALT_INT, 
+    command,
+    0,
+    1,  
+    0, 0, 0, 0, 0, 0, 0,
+    MAV_MISSION_TYPE_MISSION
   );
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
@@ -416,23 +400,26 @@ void MAVLink::set_mode(const uint16_t& mode){
 }
 
 void MAVLink::return_to_launch(){
-  printf("Returning to launch position\n");
+  printf("Returning to launch waypoint sent\n");
 
   mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MSG_ID_COMMAND_LONG_LEN];
+  uint8_t buf[MAVLINK_MSG_ID_MISSION_ITEM_INT_LEN];
 
   uint16_t command = 20; //return to launch
-  uint8_t conf = 0;
 
-  mavlink_msg_command_long_pack(
+  mavlink_msg_mission_item_int_pack(
     this->sys_id, 
-    this->comp_id, 
+    this->comp_id,
     &msg, 
     this->tgt_sys, 
-    this->tgt_comp, 
-    command, 
-    conf, 
-    0, 0, 0, 0, 0, 0, 0
+    this->tgt_comp,
+    this->mis_seq,
+    MAV_FRAME_GLOBAL_RELATIVE_ALT_INT, 
+    command,
+    0,
+    1,  
+    0, 0, 0, 0, 0, 0, 0,
+    MAV_MISSION_TYPE_MISSION
   );
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
@@ -488,7 +475,7 @@ void MAVLink::send_mission_item(){
     &msg, 
     this->tgt_sys, 
     this->tgt_comp, 
-    this->mis_seq, 
+    this->mis_seq - 1, // decrement because of takeoff waypoint 
     frame, 
     command, 
     current, 
