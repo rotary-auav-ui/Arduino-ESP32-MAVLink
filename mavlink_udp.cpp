@@ -21,11 +21,11 @@ int main(int argc, char const *argv[])
 
     // mavlink->arm_disarm(true);
 
-    mavlink->waypoints.push_back(std::make_tuple(473.977514, 85.456074, 5));
+    // mavlink->waypoints.push_back(std::make_tuple(473.977514, 85.456074, 5));
 
-    mavlink->waypoints.push_back(std::make_tuple(473.977514, 85.456081, 5));
+    // mavlink->waypoints.push_back(std::make_tuple(473.977514, 85.456081, 5));
 
-    mavlink->send_mission_count(1);
+    mavlink->send_mission_count(0);
 
     // sleep(3);
 
