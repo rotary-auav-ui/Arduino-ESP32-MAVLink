@@ -396,6 +396,45 @@ void MAVLink::land(){
   this->mis_seq++;
 }
 
+void MAVLink::loiter_time(const uint16_t& time, const float& lat, const float& longitude, const float& alt){
+  printf("Sending loiter mission for %u seconds", time);
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+
+  uint16_t command = 19; //time
+  uint8_t conf = 0;
+  float param1 = float(time);
+  float param2 = 0;
+  float param3 = 0;
+  float param4 = 0;
+  int32_t lat_send = lat * 1e7;
+  int32_t longitude_send = longitude * 1e7;
+  float alt_send = alt;
+
+  mavlink_msg_mission_item_int_pack(
+    this->sys_id, 
+    this->comp_id,
+    &msg, 
+    this->tgt_sys, 
+    this->tgt_comp,
+    this->mis_seq,
+    MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+    command,
+    0, 1,
+    param1,
+    param2,
+    param3,
+    param4,
+    lat_send,
+    longitude_send,
+    alt,
+    MAV_MISSION_TYPE_MISSION
+  );
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
+}
+
 void MAVLink::set_mode(const uint16_t& mode){
   printf("Setting mode to %u", mode);
   mavlink_message_t msg;
@@ -520,6 +559,24 @@ void MAVLink::send_mission_item(){
   printf("Mission sequence %u sent", this->mis_seq);
 
   this->mis_seq++;
+}
+
+void MAVLink::clear_all_mission(){
+  printf("Clearing all mission");
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+
+  mavlink_msg_mission_clear_all_pack(
+    this->sys_id,
+    this->comp_id,
+    &msg,
+    this->tgt_sys,
+    this->tgt_comp,
+    MAV_MISSION_TYPE_ALL
+  );
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 }
 
 void MAVLink::req_mission_list(){

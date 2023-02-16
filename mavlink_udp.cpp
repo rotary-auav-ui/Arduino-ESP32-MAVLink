@@ -25,7 +25,11 @@ int main(int argc, char const *argv[])
 
     mavlink->waypoints.push_back(std::make_tuple(473.977514, 85.456081, 5));
 
-    mavlink->send_mission_count(1);
+    mavlink->loiter_time(60, 3, 3, 3);
+
+    mavlink->clear_all_mission();
+    
+    // mavlink->send_mission_count(1);
 
     // sleep(3);
 
