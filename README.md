@@ -4,7 +4,7 @@
 
 Clone the PX4 Autopilot Library
 ```
-git clone --recurse-submodules https://github.com/PX4/PX4-Autopilot
+git clone -b v1.13.2 --recurse-submodules https://github.com/PX4/PX4-Autopilot
 cd PX4-Autopilot
 make px4_sitl gazebo
 ```
