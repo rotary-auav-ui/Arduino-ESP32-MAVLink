@@ -181,7 +181,7 @@ void MAVLink::parse_mission_ack(mavlink_message_t* msg){
   mavlink_msg_mission_ack_decode(msg, &mis_ack);
   if(mis_ack.type == MAV_MISSION_ACCEPTED){
     printf("Mission accepted\n");
-    this->start_mission();
+    // this->start_mission();
   }else{
     printf("Mission unaccepted with enum %u\n", mis_ack.type);
   }
@@ -340,8 +340,8 @@ void MAVLink::takeoff(const float& height){
     1,
     0,  
     0, 0, 0, 0, 
-    NAN, 
-    NAN, 
+    473977507, // Home position latitude
+    85456073, // Home position longitude
     param7,
     MAV_MISSION_TYPE_MISSION
   );
@@ -378,6 +378,45 @@ void MAVLink::land(){
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 
   this->mis_seq++;
+}
+
+void MAVLink::loiter_time(const uint16_t& time, const float& lat, const float& longitude, const float& alt){
+  printf("Sending loiter mission for %u seconds", time);
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+
+  uint16_t command = 19; //time
+  uint8_t conf = 0;
+  float param1 = float(time);
+  float param2 = 0;
+  float param3 = 0;
+  float param4 = 0;
+  int32_t lat_send = lat * 1e7;
+  int32_t longitude_send = longitude * 1e7;
+  float alt_send = alt;
+
+  mavlink_msg_mission_item_int_pack(
+    this->sys_id, 
+    this->comp_id,
+    &msg, 
+    this->tgt_sys, 
+    this->tgt_comp,
+    this->mis_seq,
+    MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+    command,
+    0, 1,
+    param1,
+    param2,
+    param3,
+    param4,
+    lat_send,
+    longitude_send,
+    alt,
+    MAV_MISSION_TYPE_MISSION
+  );
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 }
 
 void MAVLink::set_mode(const uint16_t& mode){
@@ -435,7 +474,7 @@ void MAVLink::return_to_launch(){
 }
 
 void MAVLink::send_mission_count(const uint16_t& num_of_mission){
-
+  this->clear_all_mission();
   this->mis_count = num_of_mission;
 
   printf("Sending mission count: %u\n", num_of_mission);
@@ -505,6 +544,24 @@ void MAVLink::send_mission_item(){
   printf("Mission sequence %u sent\n", this->mis_seq);
 
   this->mis_seq++;
+}
+
+void MAVLink::clear_all_mission(){
+  printf("Clearing all mission");
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+
+  mavlink_msg_mission_clear_all_pack(
+    this->sys_id,
+    this->comp_id,
+    &msg,
+    this->tgt_sys,
+    this->tgt_comp,
+    MAV_MISSION_TYPE_ALL
+  );
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+
+  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 }
 
 void MAVLink::req_mission_list(){

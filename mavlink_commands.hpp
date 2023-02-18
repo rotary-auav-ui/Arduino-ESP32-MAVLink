@@ -67,6 +67,9 @@ class MAVLink{
     // Land
     void land();
 
+    // Hold position for a certain amount of time
+    void loiter_time(const uint16_t& time, const float& lat, const float& longitude, const float& alt);
+    
     // Set mode (use MAV_MODE enum for parameter)
     void set_mode(const uint16_t& mode);
 
@@ -75,6 +78,9 @@ class MAVLink{
 
     // Send mission count (needed for pixhawk to start requesting mission)
     void send_mission_count(const uint16_t& num_of_mission);
+
+    // Clear All Mission
+    void clear_all_mission();
 
     // Starts mission
     void start_mission();
