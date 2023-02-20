@@ -74,6 +74,31 @@ void MAVLink::req_data_stream(){
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 }
 
+void MAVLink::req_data(uint16_t msg_id){
+
+  printf("requesting data %u \n", msg_id);
+  uint16_t command = 512;
+
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+  mavlink_msg_command_long_pack(
+    this->sys_id,
+    this->comp_id,
+    &msg, 
+    this->tgt_sys,
+    this->tgt_comp,
+    command,
+    0,
+    msg_id,
+    0, 0, 0, 0, 0,
+    2
+    );
+
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+  
+  this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
+}
+
 void MAVLink::read_data(){
   mavlink_message_t msg;
   mavlink_status_t status;
