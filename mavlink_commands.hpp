@@ -58,6 +58,8 @@ class MAVLink{
     // Set data requests from pixhawk
     void req_data_stream();
 
+    void req_data(uint16_t msg_id);
+
     // Read data from pixhawk via UART2
     void read_data();
 
