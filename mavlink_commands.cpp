@@ -149,6 +149,9 @@ void MAVLink::read_data(){
           case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
             this->parse_global_pos(&msg);
             break;
+          case MAVLINK_MSG_ID_HOME_POSITION:
+            this->parse_home_position(&msg);
+            break;
         }
       }
     }
@@ -288,6 +291,16 @@ void MAVLink::parse_mission_item(mavlink_message_t* msg){
   } 
 }
 
+void MAVLink::parse_home_position(mavlink_message_t* msg){
+  
+  mavlink_home_position_t home_pos;
+  mavlink_msg_home_position_decode(msg, &home_pos);
+  printf("home position: %d %d", home_pos.latitude, home_pos.longitude);
+  this->home_pos[0] = home_pos.latitude;
+  this->home_pos[1] = home_pos.longitude;
+  home_set = true;
+}
+
 void MAVLink::run_prearm_checks(){
   printf("Running prearm checks\n");
 
@@ -345,13 +358,18 @@ void MAVLink::arm_disarm(bool arm){
 }
 
 void MAVLink::takeoff(const float& height){ 
-  printf("Takeoff waypoint sent\n");
+  this->req_data(MAVLINK_MSG_ID_HOME_POSITION);
+  while(!home_set){
+    printf("home position not set\n");
+  }
+  printf("Takeoff waypoint sent to %d %d %f\n", this->home_pos[0], this->home_pos[1], height);
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
   uint16_t command = 22; //takeoff
   uint8_t conf = 0;
   float param7 = height;
+
 
   mavlink_msg_mission_item_int_pack(
     this->sys_id, 
@@ -365,8 +383,8 @@ void MAVLink::takeoff(const float& height){
     1,
     0,  
     0, 0, 0, 0, 
-    473977507, // Home position latitude
-    85456073, // Home position longitude
+    this->home_pos[0], // Home position latitude
+    this->home_pos[1], // Home position longitude
     param7,
     MAV_MISSION_TYPE_MISSION
   );

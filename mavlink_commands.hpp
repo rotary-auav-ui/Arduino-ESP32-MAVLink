@@ -101,12 +101,14 @@ class MAVLink{
     uint8_t tgt_sys; // id of pxhawk = 1
     uint8_t tgt_comp; // 0 broadcast, 1 work juga
     uint16_t mis_seq;
+    std::array<int32_t, 2> home_pos;
     std::array<float, 3> global_pos_curr; //lat, long, relative alt
     std::array<float, 3> velocity_curr; // velocity north, velocity east, velocity down
     uint16_t yaw_curr;
     float time_boot_sec;
     bool req_mis;
     bool armed;
+    bool home_set = false;
 
     // Check pixhawks current mode
     void parse_heartbeat(mavlink_message_t* msg);
@@ -140,6 +142,8 @@ class MAVLink{
 
     // Get downloaded missions
     void parse_mission_item(mavlink_message_t* msg);
+
+    void parse_home_position(mavlink_message_t* msg);
 
     // Run pre-arm checks
     void run_prearm_checks();
