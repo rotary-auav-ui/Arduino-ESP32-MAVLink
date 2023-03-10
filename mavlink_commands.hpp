@@ -100,6 +100,7 @@ class MAVLink{
     uint8_t comp_id; // any?
     uint8_t tgt_sys; // id of pxhawk = 1
     uint8_t tgt_comp; // 0 broadcast, 1 work juga
+    uint8_t mis_status;
     uint16_t mis_seq;
     std::array<int32_t, 2> home_pos;
     std::array<float, 3> global_pos_curr; //lat, long, relative alt

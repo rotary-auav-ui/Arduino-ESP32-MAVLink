@@ -9,8 +9,7 @@ void rd(int n){
     }
 }
 
-int main(int argc, char const *argv[])
-{
+int main(int argc, char const *argv[]){
     bool done = false;
 
     mavlink = std::make_shared<MAVLink>(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -19,23 +18,13 @@ int main(int argc, char const *argv[])
 
     std::thread t1(rd, 1);
 
-    mavlink->arm_disarm(true);
+    sleep(3);
 
-    mavlink->waypoints.push_back(std::make_tuple(473.977514, 85.456074, 5));
+    mavlink->waypoints.push_back(std::make_tuple(47.3976479, 8.5459404, 5));
 
-    // mavlink->waypoints.push_back(std::make_tuple(473.977514, 85.456081, 5));
-    
-    mavlink->send_mission_count(1);
+    mavlink->waypoints.push_back(std::make_tuple(47.3978930, 8.5459663, 5));
 
-    mavlink->set_mode(MAV_MODE_AUTO_ARMED);
-
-    // sleep(3);
-
-    // mavlink->takeoff(5);
-
-    // sleep(3);
-
-    // mavlink->set_mode(MAV_MODE_AUTO_ARMED);
+    mavlink->send_mission_count(3);
 
     t1.join();
 
