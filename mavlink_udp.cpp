@@ -18,13 +18,13 @@ int main(int argc, char const *argv[]){
 
     std::thread t1(rd, 1);
 
-    sleep(3);
+    mavlink->timeout(3);
 
     mavlink->waypoints.push_back(std::make_tuple(47.3976479, 8.5459404, 5));
 
     mavlink->waypoints.push_back(std::make_tuple(47.3978930, 8.5459663, 5));
 
-    mavlink->send_mission_count(3);
+    mavlink->send_mission_count(4);
 
     t1.join();
 

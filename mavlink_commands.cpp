@@ -139,9 +139,11 @@ void MAVLink::read_data(){
           case MAVLINK_MSG_ID_SYS_STATUS:
             this->parse_sys_status(&msg);
             break;
+          /* Not supported (i think)
           case MAVLINK_MSG_ID_MISSION_CURRENT:
             this->parse_mission_status(&msg);
             break;
+          */
           case MAVLINK_MSG_ID_MISSION_COUNT:
             this->parse_mission_count(&msg);
             break;
@@ -212,20 +214,26 @@ void MAVLink::parse_mission_request(mavlink_message_t* msg){
 void MAVLink::parse_mission_progress(mavlink_message_t* msg){
   mavlink_mission_item_reached_t it;
   mavlink_msg_mission_item_reached_decode(msg, &it);
-  // if(this->mis_seq != it.seq){
+  if(this->reached != it.seq){
     printf("Mission sequence %u reached\n", it.seq);
-  // }
+    this->reached = it.seq;
+  }
 }
 
 void MAVLink::parse_mission_ack(mavlink_message_t* msg){
   mavlink_mission_ack_t mis_ack;
   mavlink_msg_mission_ack_decode(msg, &mis_ack);
-  if(mis_ack.type == MAV_MISSION_ACCEPTED){
+  if(mis_ack.type == MAV_MISSION_ACCEPTED && mis_ack.mission_type != 255){
     printf("Mission accepted\n");
+    this->reached = NAN;
     this->arm_disarm(true);
-    sleep(1);
+    this->timeout(1);
     this->set_mode(MAV_MODE_AUTO_ARMED);
-  }else{
+  }
+  else if(mis_ack.type == MAV_MISSION_ACCEPTED && mis_ack.mission_type == 255){
+    printf("Cleared all missions\n");
+  }
+  else{
     printf("Mission unaccepted with enum %u\n", mis_ack.type);
   }
 }
@@ -262,30 +270,27 @@ void MAVLink::parse_global_pos(mavlink_message_t* msg){
 void MAVLink::parse_mission_status(mavlink_message_t* msg){
   mavlink_mission_current_t mis_stat;
   mavlink_msg_mission_current_decode(msg, &mis_stat);
-  // if(mis_stat.mission_state != this->mis_status){
-    switch (mis_stat.mission_state){
-      case MISSION_STATE_COMPLETE:
-        printf("Mission completed. Returning to launch.");
-        this->return_to_launch();
-        break;
-      case MISSION_STATE_NO_MISSION:
-        printf("No mission uploaded");
-        break;
-      case MISSION_STATE_NOT_STARTED:
-        printf("Mission uploaded but not started");
-        break;
-      case MISSION_STATE_PAUSED:
-        printf("Mission paused at waypoint %u out of %u\n", mis_stat.seq, mis_stat.total);
-        break;
-      case MISSION_STATE_ACTIVE:
-        printf("Mission active on the way to waypoint %u out of %u\n", mis_stat.seq, mis_stat.total);
-        break;
-      default:
-        printf("Unknown mission status\n");
-        break;
-    }
-    this->mis_status = mis_stat.mission_state;
-  // }
+  switch (mis_stat.mission_state){
+    case MISSION_STATE_COMPLETE:
+      printf("Mission completed\n");
+      this->return_to_launch();
+      break;
+    case MISSION_STATE_NO_MISSION:
+      printf("No mission uploaded\n");
+      break;
+    case MISSION_STATE_NOT_STARTED:
+      printf("Mission uploaded but not started\n");
+      break;
+    case MISSION_STATE_PAUSED:
+      printf("Mission paused at waypoint %u out of %u\n", mis_stat.seq, mis_stat.total);
+      break;
+    case MISSION_STATE_ACTIVE:
+      printf("Mission active on the way to waypoint %u out of %u\n", mis_stat.seq, mis_stat.total);
+      break;
+    default:
+      printf("Unknown mission status\n");
+      break;
+  }
 }
 
 void MAVLink::parse_mission_count(mavlink_message_t* msg){
@@ -526,7 +531,7 @@ void MAVLink::return_to_launch(){
 }
 
 void MAVLink::send_mission_count(const uint16_t& num_of_mission){
-  // this->clear_all_mission();
+  this->clear_all_mission();
   this->mis_count = num_of_mission;
 
   printf("Sending mission count: %u\n", num_of_mission);
@@ -686,10 +691,12 @@ void MAVLink::start_mission(){
 
   // this->req_mission_list();
 
+}
 
-  /*
-  If it takes off correctly but doesn't start mission, may need MAV_CMD_COMMAND_START here.
-  Documentation says that drone will automatically start mission when switched to auto mode,
-  with condition that mission is accepted.
-  */
+void MAVLink::timeout(uint32_t duration){
+  auto start = std::chrono::steady_clock::now();
+  std::chrono::duration<double> elapsed_seconds = 0;
+  while(elapsed_seconds < 30){
+    elapsed_seconds = std::chrono::steady_clock::now() - start;
+  }
 }

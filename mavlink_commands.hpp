@@ -11,13 +11,13 @@
 #include <fcntl.h>
 #include <time.h>
 #include <sys/time.h>
-#include <time.h>
 #include <arpa/inet.h>
 #include <stdbool.h> 
 
 #include <vector>
 #include <array>
 #include <memory>
+#include <chrono>
 
 #define BUFFER_LENGTH 2041
 
@@ -93,6 +93,8 @@ class MAVLink{
     // Arms or disarms the drone (true == arm, false == disarm)
     void arm_disarm(bool arm);
 
+    void timeout(uint32_t duration);
+
   private :
     uint8_t px_mode;
     uint8_t px_status;
@@ -101,6 +103,7 @@ class MAVLink{
     uint8_t tgt_sys; // id of pxhawk = 1
     uint8_t tgt_comp; // 0 broadcast, 1 work juga
     uint8_t mis_status;
+    uint16_t reached;
     uint16_t mis_seq;
     std::array<int32_t, 2> home_pos;
     std::array<float, 3> global_pos_curr; //lat, long, relative alt
