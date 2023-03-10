@@ -185,9 +185,9 @@ void MAVLink::parse_mission_request_int(mavlink_message_t* msg){
   if(this->mis_seq == 0){ 
     this->takeoff(5);
   }
-  // else if(this->mis_seq == this->mis_count - 1){
-  //   this->return_to_launch();
-  // }
+  else if(this->mis_seq == this->mis_count - 1){
+    this->return_to_launch();
+  }
   else{
     this->send_mission_item();
   }
@@ -201,9 +201,9 @@ void MAVLink::parse_mission_request(mavlink_message_t* msg){
   if(this->mis_seq == 0){ 
     this->takeoff(5);
   }
-  // else if(this->mis_seq == this->mis_count - 1){
-  //   this->return_to_launch();
-  // }
+  else if(this->mis_seq == this->mis_count - 1){
+    this->return_to_launch();
+  }
   else{
     this->send_mission_item();
   }
@@ -394,8 +394,8 @@ void MAVLink::takeoff(const float& height){
     this->mis_seq,
     MAV_FRAME_GLOBAL_RELATIVE_ALT_INT, 
     command,
-    0,
-    0,  
+    1,
+    1,  
     0, 0, 0, 0,
     this->home_pos[0], // Home position latitude
     this->home_pos[1], // Home position longitude
@@ -424,8 +424,8 @@ void MAVLink::land(){
     this->mis_seq,
     MAV_FRAME_GLOBAL_RELATIVE_ALT_INT, 
     command,
-    1,
-    0,  
+    0,
+    1,  
     0, 0, 0, 0, 0, 0, 0,
     MAV_MISSION_TYPE_MISSION
   );
@@ -515,8 +515,8 @@ void MAVLink::return_to_launch(){
     this->mis_seq,
     MAV_FRAME_MISSION, 
     command,
-    1,
-    0,  
+    0,
+    1,  
     0, 0, 0, 0, 0, 0, 0,
     MAV_MISSION_TYPE_MISSION
   );
@@ -558,8 +558,6 @@ void MAVLink::send_mission_item(){
 
   uint8_t frame = MAV_FRAME_GLOBAL_RELATIVE_ALT; //lat, long, altitude is relative to home altitude in meters
   uint8_t command = 16; //waypoint
-  uint8_t current = 0;
-  uint8_t cont = 0;
   float param1 = 1;
   float param2 = 1;
   float param3 = 0;
@@ -577,8 +575,8 @@ void MAVLink::send_mission_item(){
     this->mis_seq,
     frame, 
     command, 
-    current, 
-    cont, 
+    0, 
+    1, 
     param1, 
     param2, 
     param3, 
