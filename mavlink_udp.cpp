@@ -20,11 +20,11 @@ int main(int argc, char const *argv[]){
 
     mavlink->timeout(3);
 
-    mavlink->waypoints.push_back(std::make_tuple(47.3976479, 8.5459404, 5));
+    mavlink->add_waypoint(47.3976479, 8.5459404, 5);
 
-    mavlink->waypoints.push_back(std::make_tuple(47.3978930, 8.5459663, 5));
+    mavlink->add_waypoint(47.3978930, 8.5459663, 5);
 
-    mavlink->send_mission_count(4);
+    mavlink->send_mission_count();
 
     t1.join();
 

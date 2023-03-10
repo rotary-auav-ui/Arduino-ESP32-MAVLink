@@ -49,6 +49,11 @@ uint16_t MAVLink::get_yaw_curr(){
   return this->yaw_curr;
 }
 
+void MAVLink::add_waypoint(float lat, float lng, float hgt){
+  printf("Added waypoint %f %f %f to list\n", lat, lng, hgt);
+  this->waypoints.push_back(std::make_tuple(lat, lng, hgt));
+}
+
 void MAVLink::req_data_stream(){
   this->sys_id = 255;
   this->comp_id = 2;
@@ -217,6 +222,9 @@ void MAVLink::parse_mission_progress(mavlink_message_t* msg){
   if(this->reached != it.seq){
     printf("Mission sequence %u reached\n", it.seq);
     this->reached = it.seq;
+    if(this->reached == this->mis_count - 2){
+      this->waypoints.clear();
+    }
   }
 }
 
@@ -532,9 +540,14 @@ void MAVLink::return_to_launch(){
 
 void MAVLink::send_mission_count(const uint16_t& num_of_mission){
   this->clear_all_mission();
-  this->mis_count = num_of_mission;
 
-  printf("Sending mission count: %u\n", num_of_mission);
+  if(num_of_mission != 0){
+    this->mis_count = num_of_mission;
+  }else{
+    this->mis_count = this->waypoints.size() + 2;
+  }
+
+  printf("Sending mission count: %u\n", this->mis_count);
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
@@ -599,7 +612,7 @@ void MAVLink::send_mission_item(){
 }
 
 void MAVLink::clear_all_mission(){
-  printf("Clearing all mission");
+  printf("Clearing all mission\n");
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
@@ -695,8 +708,8 @@ void MAVLink::start_mission(){
 
 void MAVLink::timeout(uint32_t duration){
   auto start = std::chrono::steady_clock::now();
-  std::chrono::duration<double> elapsed_seconds = 0;
-  while(elapsed_seconds < 30){
+  std::chrono::duration<double> elapsed_seconds;
+  while(elapsed_seconds.count() < duration){
     elapsed_seconds = std::chrono::steady_clock::now() - start;
   }
 }

@@ -32,7 +32,6 @@ class MAVLink{
     int bytes_sent;
 
     uint16_t mis_count;
-    std::vector<std::tuple<float, float, float>> waypoints;
 
     // Setup serial communication
     MAVLink(int domain, int type, int protocol);
@@ -54,6 +53,8 @@ class MAVLink{
     uint16_t get_mis_seq();
 
     bool get_mis_req_status();
+
+    void add_waypoint(float lat, float lng, float hgt);
 
     // Set data requests from pixhawk
     void req_data_stream();
@@ -79,7 +80,7 @@ class MAVLink{
     void return_to_launch();
 
     // Send mission count (needed for pixhawk to start requesting mission)
-    void send_mission_count(const uint16_t& num_of_mission);
+    void send_mission_count(const uint16_t& num_of_mission = 0);
 
     // Clear All Mission
     void clear_all_mission();
@@ -113,6 +114,7 @@ class MAVLink{
     bool req_mis;
     bool armed;
     bool home_set = false;
+    std::vector<std::tuple<float, float, float>> waypoints;
 
     // Check pixhawks current mode
     void parse_heartbeat(mavlink_message_t* msg);
