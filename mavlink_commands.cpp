@@ -50,7 +50,7 @@ uint16_t MAVLink::get_yaw_curr(){
 }
 
 void MAVLink::add_waypoint(float lat, float lng, float hgt){
-  printf("Added waypoint %f %f %f to list\n", lat, lng, hgt);
+  printf("Added waypoint {\n\tlatitude  : %f\n\tlongitude : %f\n\theight    : %f\n}\n\n", lat, lng, hgt);
   this->waypoints.push_back(std::make_tuple(lat, lng, hgt));
 }
 
@@ -328,7 +328,7 @@ void MAVLink::parse_home_position(mavlink_message_t* msg){
   mavlink_home_position_t home_pos;
   mavlink_msg_home_position_decode(msg, &home_pos);
   if(home_pos.latitude != this->home_pos[0] || home_pos.longitude != this->home_pos[1]){
-    printf("Home position: %d %d\n", home_pos.latitude, home_pos.longitude);
+    printf("\nHome position {\n\tlatitude  : %d\n\tlongitude : %d\n}\n\n", home_pos.latitude, home_pos.longitude);
     this->home_pos[0] = home_pos.latitude;
     this->home_pos[1] = home_pos.longitude;
     home_set = true;
@@ -390,7 +390,7 @@ void MAVLink::arm_disarm(bool arm){
 }
 
 void MAVLink::takeoff(const float& height){ 
-  printf("Takeoff waypoint sent to %d %d %f\n", this->home_pos[0], this->home_pos[1], height);
+  printf("Waypoint %u (takeoff) set as {\n\tlatitude  : %d\n\tlongitude : %d\n\theight    : %f\n}\n\n", this->mis_seq + 1, this->home_pos[0], this->home_pos[1], height);
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
@@ -422,7 +422,7 @@ void MAVLink::takeoff(const float& height){
 }
 
 void MAVLink::land(){
-  printf("Landing waypoint sent\n");
+  printf("Waypoint %u (landing)\n", this->mis_seq + 1);
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
@@ -448,7 +448,7 @@ void MAVLink::land(){
 }
 
 void MAVLink::loiter_time(const uint16_t& time, const float& lat, const float& longitude, const float& alt){
-  printf("Sending loiter mission for %u seconds", time);
+  printf("Waypoint %u (loiter) set to latitude  : %f, longitude : %f, height    : %f, for %u seconds", this->mis_seq + 1, lat, longitude, alt, time);
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
@@ -512,7 +512,7 @@ void MAVLink::set_mode(const uint16_t& mode){
 }
 
 void MAVLink::return_to_launch(){
-  printf("Returning to launch waypoint sent\n");
+  printf("Waypoint %u (return to launch) set as {\n\tlatitude  : %f\n\tlongitude : %f\n}\n\n", this->mis_seq + 1, this->home_pos[0] / (float)1e7, this->home_pos[1] / (float)1e7);
 
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
@@ -568,9 +568,14 @@ void MAVLink::send_mission_count(const uint16_t& num_of_mission){
 }
 
 void MAVLink::send_mission_item(){
+  if(this->waypoints.size() == 0) return;
+
   float lat = std::get<0>(this->waypoints.at(this->mis_seq - 1));
   float lng = std::get<1>(this->waypoints.at(this->mis_seq - 1));
   float hgt = std::get<2>(this->waypoints.at(this->mis_seq - 1));
+
+  printf("Waypoint %u (waypoint) set as {\n\tlatitude  : %f\n\tlongitude : %f\n\theight    : %f\n}\n\n", this->mis_seq + 1, lat, lng, hgt);
+
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
@@ -608,7 +613,6 @@ void MAVLink::send_mission_item(){
 
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 
-  printf("Setting waypoint lat : %d, lng : %d, height : %f\n", lat_send, lng_send, hgt);
 }
 
 void MAVLink::clear_all_mission(){
