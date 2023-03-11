@@ -706,7 +706,7 @@ void MAVLink::send_mission_ack(){
 void MAVLink::start_mission(){
   printf("Starting mission\n");
 
-  // this->req_mission_list();
+  this->req_mission_list();
 
 }
 

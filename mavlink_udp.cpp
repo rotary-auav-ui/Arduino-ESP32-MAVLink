@@ -26,6 +26,10 @@ int main(int argc, char const *argv[]){
 
     mavlink->send_mission_count();
 
+    mavlink->timeout(2);
+
+    mavlink->start_mission();
+
     t1.join();
 
     return 0;
