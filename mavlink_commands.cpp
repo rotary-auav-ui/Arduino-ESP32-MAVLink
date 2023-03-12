@@ -12,6 +12,10 @@ MAVLink::MAVLink(int domain, int type, int protocol) {
 	this->destAddr.sin_port = htons(18570);
   this->fromlen = sizeof(this->destAddr);
 
+  this->req_data_stream();
+
+  this->timeout(2);
+
   this->req_data(MAVLINK_MSG_ID_HOME_POSITION);
 }
 
@@ -27,10 +31,6 @@ uint8_t MAVLink::get_px_status(){
 
 uint16_t MAVLink::get_mis_seq(){
   return this->mis_seq;
-}
-
-bool MAVLink::get_mis_req_status(){
-  return this->req_mis;
 }
 
 std::array<float,3> MAVLink::get_global_pos_curr(){
@@ -49,7 +49,15 @@ uint16_t MAVLink::get_yaw_curr(){
   return this->yaw_curr;
 }
 
-void MAVLink::add_waypoint(float lat, float lng, float hgt){
+void MAVLink::set_fly_alt(const float& hgt){
+  this->fly_alt = hgt;
+}
+
+void MAVLink::add_waypoint(const float& lat, const float& lng){
+  this->waypoints.push_back(std::make_tuple(lat, lng, this->fly_alt));
+}
+
+void MAVLink::add_waypoint(const float& lat, const float& lng, const float& hgt){
   printf("Added waypoint {\n\tlatitude  : %f\n\tlongitude : %f\n\theight    : %f\n}\n\n", lat, lng, hgt);
   this->waypoints.push_back(std::make_tuple(lat, lng, hgt));
 }
@@ -190,7 +198,7 @@ void MAVLink::parse_mission_request_int(mavlink_message_t* msg){
   this->mis_seq = mis_req.seq;
   printf("Requesting for mission type %u sequence %u\n", mis_req.mission_type, this->mis_seq);
   if(this->mis_seq == 0){ 
-    this->takeoff(5);
+    this->takeoff();
   }
   else if(this->mis_seq == this->mis_count - 1){
     this->return_to_launch();
@@ -206,7 +214,7 @@ void MAVLink::parse_mission_request(mavlink_message_t* msg){
   this->mis_seq = mis_req.seq;
   printf("Requesting for mission type %u sequence %u\n", mis_req.mission_type, this->mis_seq);
   if(this->mis_seq == 0){ 
-    this->takeoff(5);
+    this->takeoff();
   }
   else if(this->mis_seq == this->mis_count - 1){
     this->return_to_launch();
@@ -234,15 +242,15 @@ void MAVLink::parse_mission_ack(mavlink_message_t* msg){
   if(mis_ack.type == MAV_MISSION_ACCEPTED && mis_ack.mission_type != 255){
     printf("Mission accepted\n");
     this->reached = NAN;
-    this->arm_disarm(true);
-    this->timeout(1);
-    this->set_mode(MAV_MODE_AUTO_ARMED);
+    this->mission_valid = true;
+    this->start_mission();
   }
   else if(mis_ack.type == MAV_MISSION_ACCEPTED && mis_ack.mission_type == 255){
     printf("Cleared all missions\n");
   }
   else{
     printf("Mission unaccepted with enum %u\n", mis_ack.type);
+    this->mission_valid = false;
   }
 }
 
@@ -331,7 +339,6 @@ void MAVLink::parse_home_position(mavlink_message_t* msg){
     printf("\nHome position {\n\tlatitude  : %d\n\tlongitude : %d\n}\n\n", home_pos.latitude, home_pos.longitude);
     this->home_pos[0] = home_pos.latitude;
     this->home_pos[1] = home_pos.longitude;
-    home_set = true;
   }
 }
 
@@ -385,14 +392,18 @@ void MAVLink::arm_disarm(bool arm){
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
+}
 
-  this->armed = true;
+void MAVLink::takeoff(){
+  this->takeoff(this->fly_alt);
 }
 
 void MAVLink::takeoff(const float& height){ 
   printf("Waypoint %u (takeoff) set as {\n\tlatitude  : %d\n\tlongitude : %d\n\theight    : %f\n}\n\n", this->mis_seq + 1, this->home_pos[0], this->home_pos[1], height);
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+
+  this->fly_alt = height;
 
   uint16_t command = 22; //takeoff
   uint8_t conf = 0;
@@ -538,7 +549,7 @@ void MAVLink::return_to_launch(){
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
 }
 
-void MAVLink::send_mission_count(const uint16_t& num_of_mission){
+void MAVLink::send_mission(const uint16_t& num_of_mission){
   this->clear_all_mission();
 
   if(num_of_mission != 0){
@@ -570,6 +581,7 @@ void MAVLink::send_mission_count(const uint16_t& num_of_mission){
 void MAVLink::send_mission_item(){
   if(this->waypoints.size() == 0) return;
 
+  
   float lat = std::get<0>(this->waypoints.at(this->mis_seq - 1));
   float lng = std::get<1>(this->waypoints.at(this->mis_seq - 1));
   float hgt = std::get<2>(this->waypoints.at(this->mis_seq - 1));
@@ -681,7 +693,6 @@ void MAVLink::send_mission_ack(){
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
-  // TODO : Better error handling here
   mavlink_msg_mission_ack_pack(
     this->sys_id,
     this->comp_id,
@@ -695,18 +706,16 @@ void MAVLink::send_mission_ack(){
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
 
   this->bytes_sent = sendto(this->sockfd, buf, len, 0, (struct sockaddr*)&this->destAddr, sizeof(struct sockaddr_in));
-
-  /*
-  if waypoints are correct -> takeoff
-  else cancel
-  */
 }
 
-// TODO : Implement a better way to start mission
 void MAVLink::start_mission(){
-  printf("Starting mission\n");
-
   this->req_mission_list();
+
+  if(this->mission_valid){
+    printf("Mission is valid. Starting Mission!\n");
+  }else{
+    printf("Cannot start mission. Mission is invalid\n");
+  }
 
 }
 
@@ -717,3 +726,4 @@ void MAVLink::timeout(uint32_t duration){
     elapsed_seconds = std::chrono::steady_clock::now() - start;
   }
 }
+

@@ -18,6 +18,7 @@
 #include <array>
 #include <memory>
 #include <chrono>
+#include <thread>
 
 #define BUFFER_LENGTH 2041
 
@@ -54,7 +55,12 @@ class MAVLink{
 
     bool get_mis_req_status();
 
-    void add_waypoint(float lat, float lng, float hgt);
+    void set_fly_alt(const float& hgt);
+
+    // Overload waypoint to use default height
+    void add_waypoint(const float& lat, const float& lng);
+
+    void add_waypoint(const float& lat, const float& lng, const float& hgt);
 
     // Set data requests from pixhawk
     void req_data_stream();
@@ -63,6 +69,9 @@ class MAVLink{
 
     // Read data from pixhawk via UART2
     void read_data();
+
+    // Overload takeoff with default height
+    void takeoff();
 
     // Takeoff
     void takeoff(const float& height);
@@ -80,7 +89,7 @@ class MAVLink{
     void return_to_launch();
 
     // Send mission count (needed for pixhawk to start requesting mission)
-    void send_mission_count(const uint16_t& num_of_mission = 0);
+    void send_mission(const uint16_t& num_of_mission = 0);
 
     // Clear All Mission
     void clear_all_mission();
@@ -111,9 +120,9 @@ class MAVLink{
     std::array<float, 3> velocity_curr; // velocity north, velocity east, velocity down
     uint16_t yaw_curr;
     float time_boot_sec;
+    float fly_alt = 5;
     bool req_mis;
-    bool armed;
-    bool home_set = false;
+    bool mission_valid = false;
     std::vector<std::tuple<float, float, float>> waypoints;
 
     // Check pixhawks current mode
