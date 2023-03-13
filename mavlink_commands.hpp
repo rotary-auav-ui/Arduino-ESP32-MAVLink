@@ -62,6 +62,8 @@ class MAVLink{
 
     void add_waypoint(const float& lat, const float& lng, const float& hgt);
 
+    void send_heartbeat();
+
     // Set data requests from pixhawk
     void req_data_stream();
 

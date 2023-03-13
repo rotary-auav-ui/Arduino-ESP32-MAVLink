@@ -5,6 +5,7 @@ std::shared_ptr<MAVLink> mavlink;
 
 void rd(int n){
     while(1){
+        mavlink->send_heartbeat();
         mavlink->read_data();
     }
 }
