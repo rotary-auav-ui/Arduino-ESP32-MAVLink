@@ -1,5 +1,6 @@
 #include "mavlink_commands.hpp"
 #include <thread>
+#include <array>
 
 std::shared_ptr<MAVLink> mavlink;
 

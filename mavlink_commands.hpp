@@ -49,7 +49,7 @@ class MAVLink{
 
     float get_time_boot();
 
-    uint16_t get_yaw_curr();
+    float get_yaw_curr();
 
     uint16_t get_mis_seq();
 
@@ -120,7 +120,7 @@ class MAVLink{
     std::array<int32_t, 2> home_pos;
     std::array<float, 3> global_pos_curr; //lat, long, relative alt
     std::array<float, 3> velocity_curr; // velocity north, velocity east, velocity down
-    uint16_t yaw_curr;
+    float yaw_curr;
     float time_boot_sec;
     float fly_alt = 5;
     bool req_mis;
@@ -150,9 +150,6 @@ class MAVLink{
 
     // Receive current global pos and velocity
     void parse_global_pos(mavlink_message_t * msg);
-
-    // Status of currently run mission
-    void parse_mission_status(mavlink_message_t* msg);
 
     // Get downloaded mission count
     void parse_mission_count(mavlink_message_t* msg);
