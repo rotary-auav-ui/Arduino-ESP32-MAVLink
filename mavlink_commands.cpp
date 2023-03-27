@@ -21,8 +21,16 @@ uint8_t MAVLink::get_px_status(){
   return this->px_status;
 }
 
-uint16_t MAVLink::get_mis_seq(){
-  return this->mis_seq;
+int8_t MAVLink::get_battery_status(){
+  return this->battery_status;
+}
+
+uint16_t MAVLink::get_mis_reached(){
+  return this->reached;
+}
+
+bool MAVLink::get_armed(){
+  return this->armed;
 }
 
 std::array<float,3> MAVLink::get_global_pos_curr(){
@@ -147,7 +155,7 @@ void MAVLink::read_data(){
           this->parse_mission_ack(&msg);
           break;
         case MAVLINK_MSG_ID_MISSION_ITEM_REACHED:
-          this->parse_mission_progress(&msg);
+          this->parse_mission_item_reached(&msg);
           break;
         case MAVLINK_MSG_ID_COMMAND_ACK:
           this->parse_command_ack(&msg);
@@ -178,6 +186,7 @@ void MAVLink::parse_heartbeat(mavlink_message_t* msg){
   if(this->px_mode != hb.base_mode || this->px_status != hb.system_status){
     this->px_mode = hb.base_mode;
     this->px_status = hb.system_status;
+    this->armed = (this->px_mode >= MAV_MODE_FLAG_SAFETY_ARMED);
     Serial.printf("Heartbeat detected\nMode : %u\nSystem : %u\n", this->px_mode, this->px_status);
   }
 }
@@ -220,7 +229,7 @@ void MAVLink::parse_mission_request(mavlink_message_t* msg){
   }
 }
 
-void MAVLink::parse_mission_progress(mavlink_message_t* msg){
+void MAVLink::parse_mission_item_reached(mavlink_message_t* msg){
   mavlink_mission_item_reached_t it;
   mavlink_msg_mission_item_reached_decode(msg, &it);
   if(this->reached != it.seq){
@@ -252,17 +261,8 @@ void MAVLink::parse_mission_ack(mavlink_message_t* msg){
 void MAVLink::parse_sys_status(mavlink_message_t* msg){
   mavlink_sys_status_t sys_status;
   mavlink_msg_sys_status_decode(msg, &sys_status);
-  // printf(
-  //   "Sensors Present : %u\n\
-  //   Sensors Enabled : %u\n\
-  //   Sensors Healthy : %u\n\
-  //   Load (<1000%): %u %\n\
-  //   Battery Voltage : %u V\n\
-  //   Battery Current : %u cA\n\
-  //   Battery Remaining : %u %\n\
-  //   Comm Drop Rate : %u c%\n\
-  //   Comm Errors : %u\n"
-  // );
+  this->battery_status = sys_status.battery_remaining;
+  Serial.printf("Battery remaining : %d\n", this->battery_status);
 }
 
 void MAVLink::parse_global_pos(mavlink_message_t* msg){
@@ -451,17 +451,22 @@ void MAVLink::land(){
   Serial2.write(buf, len);
 }
 
+void MAVLink::loiter_time(const uint16_t& time){
+  this->loiter_time(time, 
+    std::get<0>(this->waypoints.at(this->mis_seq - 1)), 
+    std::get<0>(this->waypoints.at(this->mis_seq - 1)), 
+    std::get<0>(this->waypoints.at(this->mis_seq - 1))
+  );
+}
+
 void MAVLink::loiter_time(const uint16_t& time, const float& lat, const float& longitude, const float& alt){
   Serial.printf("Sending loiter mission for %u seconds", time);
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
-  uint16_t command = 19; //time
+  uint16_t command = 19; //loiter time
   uint8_t conf = 0;
   float param1 = float(time);
-  float param2 = 0;
-  float param3 = 0;
-  float param4 = 0;
 
   mavlink_msg_mission_item_int_pack(
     this->sys_id, 
@@ -473,10 +478,10 @@ void MAVLink::loiter_time(const uint16_t& time, const float& lat, const float& l
     MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
     command,
     0, 1,
-    param1,
-    param2,
-    param3,
-    param4,
+    (float) time,
+    0,
+    0,
+    0,
     lat,
     longitude,
     alt,
@@ -492,10 +497,10 @@ void MAVLink::set_servo(uint8_t port, uint16_t pwm){
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
 
-  uint16_t command = 183; //do set mode
+  uint16_t command = 183; //do set serov
   uint8_t conf = 0;
-  float param1 = 5; //auto disarmed
-  float param2 = 100000;
+  float param1 = port;
+  float param2 = 2000;
 
   mavlink_msg_command_long_pack(
     this->sys_id, 
@@ -594,7 +599,7 @@ void MAVLink::send_mission(const uint16_t& num_of_mission){
   Serial2.write(buf, len);
 }
 
-void MAVLink::send_mission_item(){
+void MAVLink::send_mission_item(const float& hold_time){
   float lat = std::get<0>(this->waypoints.at(this->mis_seq - 1));
   float lng = std::get<1>(this->waypoints.at(this->mis_seq - 1));
   float hgt = std::get<2>(this->waypoints.at(this->mis_seq - 1));
@@ -621,7 +626,7 @@ void MAVLink::send_mission_item(){
     command, 
     0, 
     1, 
-    0,
+    hold_time,
     0,
     0,
     0, 
