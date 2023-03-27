@@ -155,7 +155,7 @@ void MAVLink::read_data(){
           this->parse_mission_ack(&msg);
           break;
         case MAVLINK_MSG_ID_MISSION_ITEM_REACHED:
-          this->parse_mission_progress(&msg);
+          this->parse_mission_item_reached(&msg);
           break;
         case MAVLINK_MSG_ID_COMMAND_ACK:
           this->parse_command_ack(&msg);
@@ -599,7 +599,7 @@ void MAVLink::send_mission(const uint16_t& num_of_mission){
   Serial2.write(buf, len);
 }
 
-void MAVLink::send_mission_item(float hold_time){
+void MAVLink::send_mission_item(const float& hold_time){
   float lat = std::get<0>(this->waypoints.at(this->mis_seq - 1));
   float lng = std::get<1>(this->waypoints.at(this->mis_seq - 1));
   float hgt = std::get<2>(this->waypoints.at(this->mis_seq - 1));

@@ -22,12 +22,12 @@ class MAVLink{
     uint8_t get_px_mode();
 
     uint8_t get_px_status();
-    //.
+    
     int8_t get_battery_status();
-    //.
+    
     uint16_t get_mis_reached();
-    //.
-    char get_drone_status(); 
+    
+    bool get_armed(); 
 
     std::array<float, 3> get_global_pos_curr();
 
