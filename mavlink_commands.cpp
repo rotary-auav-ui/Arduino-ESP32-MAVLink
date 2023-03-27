@@ -235,6 +235,11 @@ void MAVLink::parse_mission_item_reached(mavlink_message_t* msg){
   if(this->reached != it.seq){
     Serial.printf("Mission sequence %u reached\n", it.seq);
     this->reached = it.seq;
+    if(this->reached % 2 == 1){
+      this->set_servo(4, 2000);
+    }else{
+      this->set_servo(4, 0);
+    }
     if(this->reached == this->mis_count - 2){
       this->waypoints.clear();
     }
@@ -261,8 +266,7 @@ void MAVLink::parse_mission_ack(mavlink_message_t* msg){
 void MAVLink::parse_sys_status(mavlink_message_t* msg){
   mavlink_sys_status_t sys_status;
   mavlink_msg_sys_status_decode(msg, &sys_status);
-  this->battery_status = sys_status.battery_remaining;
-  Serial.printf("Battery remaining : %d\n", this->battery_status);
+  this->battery_status = (int)(sys_status.battery_remaining / 255.0) * 100;
 }
 
 void MAVLink::parse_global_pos(mavlink_message_t* msg){
