@@ -34,6 +34,18 @@ uint8_t MAVLink::get_px_status(){
   return this->px_status;
 }
 
+uint8_t MAVLink::get_battery_status(){
+  return this->battery_status;
+}
+
+uint16_t MAVLink::get_mis_reached(){
+  return this->reached;
+}
+
+bool MAVLink::get_armed(){
+  return this->armed;
+}
+
 uint16_t MAVLink::get_mis_seq(){
   return this->mis_seq;
 }
@@ -160,7 +172,7 @@ void MAVLink::read_data(){
       this->parse_mission_ack(&msg);
       break;
     case MAVLINK_MSG_ID_MISSION_ITEM_REACHED:
-      this->parse_mission_progress(&msg);
+      this->parse_mission_item_reached(&msg);
       break;
     case MAVLINK_MSG_ID_COMMAND_ACK:
       this->parse_command_ack(&msg);
@@ -180,6 +192,9 @@ void MAVLink::read_data(){
     case MAVLINK_MSG_ID_HOME_POSITION:
       this->parse_home_position(&msg);
       break;
+    case MAVLINK_MSG_ID_MISSION_CURRENT:
+      this->parse_mission_current(&msg);
+      break;
   }
 }
 
@@ -191,6 +206,7 @@ void MAVLink::parse_heartbeat(mavlink_message_t* msg){
   
   this->px_mode = hb.base_mode;
   this->px_status = hb.system_status;
+  this->armed = this->px_status >= 128;
   log_printf("Heartbeat detected\nMode : %u\nSystem : %u\n", this->px_mode, this->px_status);
 }
 
@@ -232,7 +248,7 @@ void MAVLink::parse_mission_request(mavlink_message_t* msg){
   }
 }
 
-void MAVLink::parse_mission_progress(mavlink_message_t* msg){
+void MAVLink::parse_mission_item_reached(mavlink_message_t* msg){
   mavlink_mission_item_reached_t it;
   mavlink_msg_mission_item_reached_decode(msg, &it);
   // dont log or store data if mission is not completed
@@ -265,17 +281,7 @@ void MAVLink::parse_mission_ack(mavlink_message_t* msg){
 void MAVLink::parse_sys_status(mavlink_message_t* msg){
   mavlink_sys_status_t sys_status;
   mavlink_msg_sys_status_decode(msg, &sys_status);
-  // printf(
-  //   "Sensors Present : %u\n\
-  //   Sensors Enabled : %u\n\
-  //   Sensors Healthy : %u\n\
-  //   Load (<1000%): %u %\n\
-  //   Battery Voltage : %u V\n\
-  //   Battery Current : %u cA\n\
-  //   Battery Remaining : %u %\n\
-  //   Comm Drop Rate : %u c%\n\
-  //   Comm Errors : %u\n"
-  // );
+  this->battery_status = (int)(sys_status.battery_remaining / 2.55);
 }
 
 void MAVLink::parse_global_pos(mavlink_message_t* msg){
@@ -291,13 +297,12 @@ void MAVLink::parse_global_pos(mavlink_message_t* msg){
   this->yaw_curr = global_pos.hdg / 1e2;
 }
 
-void MAVLink::parse_mission_status(mavlink_message_t* msg){
+void MAVLink::parse_mission_current(mavlink_message_t* msg){
   mavlink_mission_current_t mis_stat;
   mavlink_msg_mission_current_decode(msg, &mis_stat);
   switch (mis_stat.mission_state){
     case MISSION_STATE_COMPLETE:
       log_printf("Mission completed\n");
-      this->return_to_launch();
       break;
     case MISSION_STATE_NO_MISSION:
       log_printf("No mission uploaded\n");
@@ -502,8 +507,8 @@ void MAVLink::set_servo(uint8_t port, uint16_t pwm){
 
   uint16_t command = 183; //do set mode
   uint8_t conf = 0;
-  float param1 = 5; //auto disarmed
-  float param2 = 100000;
+  float param1 = (float) port; //auto disarmed
+  float param2 = (float) pwm;
 
   mavlink_msg_command_long_pack(
     this->sys_id, 
@@ -599,7 +604,7 @@ void MAVLink::send_mission(const uint16_t& num_of_mission){
   comm->write(this->buf, this->len);
 }
 
-void MAVLink::send_mission_item(){
+void MAVLink::send_mission_item(const float& hold_time){
   float lat = std::get<0>(this->waypoints.at(this->mis_seq - 1));
   float lng = std::get<1>(this->waypoints.at(this->mis_seq - 1));
   float hgt = std::get<2>(this->waypoints.at(this->mis_seq - 1));
@@ -625,7 +630,7 @@ void MAVLink::send_mission_item(){
     command, 
     0, 
     1, 
-    0,
+    hold_time,
     0,
     0,
     0, 

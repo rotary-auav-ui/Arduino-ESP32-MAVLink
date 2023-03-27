@@ -40,6 +40,10 @@ class MAVLink{
 
     uint8_t get_px_status();
 
+    uint8_t get_battery_status();
+
+    uint16_t get_mis_reached();
+
     std::array<float, 3> get_global_pos_curr();
 
     std::array<float, 3> get_velocity_curr();
@@ -51,6 +55,8 @@ class MAVLink{
     uint16_t get_mis_seq();
 
     bool get_mis_req_status();
+
+    bool get_armed();
 
     void set_fly_alt(const float& hgt);
 
@@ -96,7 +102,7 @@ class MAVLink{
     void start_mission();
 
     // Sends 1 mission item
-    void send_mission_item();
+    void send_mission_item(const float& hold_time = 10);
 
     // Arms or disarms the drone (true == arm, false == disarm)
     void arm_disarm(const bool& arm);
@@ -120,6 +126,7 @@ class MAVLink{
     uint8_t sys_id = 255; // GCS id
     uint8_t comp_id = 2; // any?
     uint8_t mis_status;
+    uint8_t battery_status;
     uint16_t reached;
     uint16_t mis_seq;
     std::array<int32_t, 2> home_pos;
@@ -130,6 +137,7 @@ class MAVLink{
     float fly_alt = 5;
     bool req_mis;
     bool mission_valid = false;
+    bool armed = false;
     std::vector<std::tuple<float, float, float>> waypoints;
 
     // Check pixhawk current mode
@@ -142,7 +150,7 @@ class MAVLink{
     void parse_mission_request(mavlink_message_t* msg);
 
     // Check mission items reached
-    void parse_mission_progress(mavlink_message_t* msg);
+    void parse_mission_item_reached(mavlink_message_t* msg);
 
     // Check whether uploaded mission is accepted
     void parse_mission_ack(mavlink_message_t* msg);
@@ -157,7 +165,7 @@ class MAVLink{
     void parse_global_pos(mavlink_message_t * msg);
 
     // Status of currently run mission
-    void parse_mission_status(mavlink_message_t* msg);
+    void parse_mission_current(mavlink_message_t* msg);
 
     // Get downloaded mission count
     void parse_mission_count(mavlink_message_t* msg);
