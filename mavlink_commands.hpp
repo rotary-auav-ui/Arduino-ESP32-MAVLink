@@ -23,7 +23,7 @@ class MAVLink{
 
     uint8_t get_px_status();
     
-    int8_t get_battery_status();
+    uint8_t get_battery_status();
     
     uint16_t get_mis_reached();
     

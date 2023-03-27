@@ -21,7 +21,7 @@ uint8_t MAVLink::get_px_status(){
   return this->px_status;
 }
 
-int8_t MAVLink::get_battery_status(){
+uint8_t MAVLink::get_battery_status(){
   return this->battery_status;
 }
 
@@ -266,7 +266,7 @@ void MAVLink::parse_mission_ack(mavlink_message_t* msg){
 void MAVLink::parse_sys_status(mavlink_message_t* msg){
   mavlink_sys_status_t sys_status;
   mavlink_msg_sys_status_decode(msg, &sys_status);
-  this->battery_status = (int)(sys_status.battery_remaining / 255.0) * 100;
+  this->battery_status = (int)(sys_status.battery_remaining / 2.55);
 }
 
 void MAVLink::parse_global_pos(mavlink_message_t* msg){
