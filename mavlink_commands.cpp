@@ -33,7 +33,11 @@ bool MAVLink::get_armed(){
   return this->armed;
 }
 
-std::array<float,3> MAVLink::get_global_pos_curr(){
+std::array<int32_t, 2> MAVLink::get_home_pos_curr(){
+  return this->home_pos;
+} 
+
+std::array<int32_t, 3> MAVLink::get_global_pos_curr(){
   return this->global_pos_curr;
 }
 
@@ -58,7 +62,7 @@ void MAVLink::add_waypoint(const float& lat, const float& lng){
   this->waypoints.push_back(std::make_tuple(lat, lng, this->fly_alt));
 }
 
-void MAVLink::add_waypoint(float lat, float lng, float hgt){
+void MAVLink::add_waypoint(const float& lat, const float& lng, const float& hgt){
   Serial.printf("Added waypoint %f %f %f to list\n", lat, lng, hgt);
   this->waypoints.push_back(std::make_tuple(lat, lng, hgt));
 }
@@ -105,7 +109,7 @@ void MAVLink::req_data_stream(){
   Serial2.write(buf, len);
 }
 
-void MAVLink::req_data(uint16_t msg_id){
+void MAVLink::req_data(const uint16_t& msg_id){
 
   Serial.printf("Requesting data %u \n", msg_id);
   uint16_t command = 512;
@@ -235,10 +239,14 @@ void MAVLink::parse_mission_item_reached(mavlink_message_t* msg){
   if(this->reached != it.seq){
     Serial.printf("Mission sequence %u reached\n", it.seq);
     this->reached = it.seq;
-    if(this->reached % 2 == 1){
-      this->set_servo(4, 2000);
-    }else{
-      this->set_servo(4, 0);
+    if(this->reached > 0 && this->global_pos_curr[2] > 2){
+      if((this->velocity_curr[0] < 1 && 
+          this->velocity_curr[1] < 1 && 
+          this->velocity_curr[2] < 1)){
+        this->set_servo(4, 2000);
+      }else{
+        this->set_servo(4, 0);
+      }
     }
     if(this->reached == this->mis_count - 2){
       this->waypoints.clear();
@@ -250,16 +258,14 @@ void MAVLink::parse_mission_ack(mavlink_message_t* msg){
   mavlink_mission_ack_t mis_ack;
   mavlink_msg_mission_ack_decode(msg, &mis_ack);
   if(mis_ack.type == MAV_MISSION_ACCEPTED && mis_ack.mission_type != 255){
-    Serial.printf("Mission accepted\n");
+    Serial.printf("Mission accepted. Starting mission\n");
     this->reached = NAN;
-    this->mission_valid = true;
   }
   else if(mis_ack.type == MAV_MISSION_ACCEPTED && mis_ack.mission_type == 255){
     Serial.printf("Cleared all missions\n");
   }
   else{
     Serial.printf("Mission unaccepted with enum %u\n", mis_ack.type);
-    this->mission_valid = false;
   }
 }
 
@@ -272,9 +278,9 @@ void MAVLink::parse_sys_status(mavlink_message_t* msg){
 void MAVLink::parse_global_pos(mavlink_message_t* msg){
   mavlink_global_position_int_t global_pos;
   mavlink_msg_global_position_int_decode(msg, &global_pos);
-  this->global_pos_curr[0] = global_pos.lat / 1e7;
-  this->global_pos_curr[1] = global_pos.lon / 1e7;
-  this->global_pos_curr[2] = global_pos.relative_alt / 1e3;
+  this->global_pos_curr[0] = global_pos.lat;
+  this->global_pos_curr[1] = global_pos.lon;
+  this->global_pos_curr[2] = global_pos.relative_alt;
   this->velocity_curr[0] = global_pos.vx / 1e2;
   this->velocity_curr[1] = global_pos.vy / 1e2;
   this->velocity_curr[2] = global_pos.vz / 1e2;
@@ -325,9 +331,7 @@ void MAVLink::parse_mission_item(mavlink_message_t* msg){
   Serial.printf("Downloaded waypoint %u {\n\tlatitude  : %f\n\tlongitude : %f\n\theight    : %f\n}\n\n", recv_mis.seq, recv_mis.x / 1e7, recv_mis.y / 1e7, recv_mis.z);
   if(recv_mis.seq != this->mis_count - 1) this->req_mission_item();
   else{
-    this->mis_seq = 0;
-    this->arm_disarm(true);
-    this->set_mode(MAV_MODE_AUTO_ARMED);
+    this->send_mission_ack();
   } 
 }
 
@@ -335,7 +339,7 @@ void MAVLink::parse_home_position(mavlink_message_t* msg){
   mavlink_home_position_t home_pos;
   mavlink_msg_home_position_decode(msg, &home_pos);
   if(home_pos.latitude != this->home_pos[0] || home_pos.longitude != this->home_pos[1]){
-    Serial.printf("Home position: %f %f\n", home_pos.latitude, home_pos.longitude);
+    Serial.printf("Home position: %f %f\n", home_pos.latitude / 1e7, home_pos.longitude / 1e7);
     this->home_pos[0] = home_pos.latitude;
     this->home_pos[1] = home_pos.longitude;
   }
@@ -365,7 +369,7 @@ void MAVLink::run_prearm_checks(){
   Serial2.write(buf, len);
 }
 
-void MAVLink::arm_disarm(bool arm){
+void MAVLink::arm_disarm(const bool& arm){
   if(arm) Serial.printf("Arming\n"); else Serial.printf("Disarming\n");
   
   mavlink_message_t msg;
@@ -496,7 +500,7 @@ void MAVLink::loiter_time(const uint16_t& time, const float& lat, const float& l
   Serial2.write(buf, len);
 }
 
-void MAVLink::set_servo(uint8_t port, uint16_t pwm){
+void MAVLink::set_servo(const uint8_t& port, const uint16_t& pwm){
   Serial.printf("Setting servo");
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
@@ -726,19 +730,21 @@ void MAVLink::send_mission_ack(){
 
   Serial2.write(buf, len);
 
+  Serial.printf("Starting mission\n");
+
+  this->mis_seq = 0;
+  this->arm_disarm(true);
+
+  this->timeout(2);
+
+  this->set_mode(MAV_MODE_AUTO_ARMED);
 }
 
 void MAVLink::start_mission(){
   this->req_mission_list();
-
-  if(this->mission_valid){
-    printf("Mission is valid. Starting mission!\n");
-  }else{
-    printf("Cannot start mission. Mission is invalid\n");
-  }
 }
 
-void MAVLink::timeout(uint32_t duration){
+void MAVLink::timeout(const uint32_t& duration){
   //time now millisecond
   unsigned long start = millis();
   while(millis() < start + duration * 1000);

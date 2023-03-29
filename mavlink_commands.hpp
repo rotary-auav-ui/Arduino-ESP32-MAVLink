@@ -9,10 +9,6 @@
 
 class MAVLink{
   public :
-    uint8_t px_mode = 0;
-    uint8_t px_status = 0;
-
-    uint16_t mis_count;
 
     // Setup serial communication
     MAVLink(const int& baud_rate, const uint8_t& rx, const uint8_t& tx);
@@ -29,7 +25,9 @@ class MAVLink{
     
     bool get_armed(); 
 
-    std::array<float, 3> get_global_pos_curr();
+    std::array<int32_t, 2> get_home_pos_curr();
+
+    std::array<int32_t, 3> get_global_pos_curr();
 
     std::array<float, 3> get_velocity_curr();
 
@@ -46,14 +44,14 @@ class MAVLink{
     // Overload waypoint to use default height
     void add_waypoint(const float& lat, const float& lng);
 
-    void add_waypoint(float lat, float lng, float hgt);
+    void add_waypoint(const float& lat, const float& lng, const float& hgt);
 
     void send_heartbeat();
 
     // Set data requests from pixhawk
     void req_data_stream();
 
-    void req_data(uint16_t msg_id);
+    void req_data(const uint16_t& msg_id);
 
     // Read data from pixhawk via UART2
     void read_data();
@@ -91,29 +89,31 @@ class MAVLink{
     void send_mission_item(const float& hold_time = 10);
 
     // Arms or disarms the drone (true == arm, false == disarm)
-    void arm_disarm(bool arm);
+    void arm_disarm(const bool& arm);
 
-    void timeout(uint32_t duration);
+    void timeout(const uint32_t& duration);
 
-    void set_servo(uint8_t port, uint16_t pwm);
+    void set_servo(const uint8_t& port, const uint16_t& pwm);
 
   private :
+    uint8_t px_mode = 0;
+    uint8_t px_status = 0;
     uint8_t sys_id = 255; // GCS id
-    uint8_t comp_id = 2; // any?
-    uint8_t tgt_sys = 1; // id of pxhawk = 1
-    uint8_t tgt_comp = 0; // 0 broadcast, 1 work juga
+    uint8_t comp_id = 2; 
+    uint8_t tgt_sys = 1; 
+    uint8_t tgt_comp = 0; 
     uint8_t mis_status;
     uint8_t battery_status;
+    uint16_t mis_count;
     uint16_t reached;
     uint16_t mis_seq;
     std::array<int32_t, 2> home_pos;
-    std::array<float, 3> global_pos_curr; //lat, long, relative alt
+    std::array<int32_t, 3> global_pos_curr; //lat, long, relative alt
     std::array<float, 3> velocity_curr; // velocity north, velocity east, velocity down
     uint16_t yaw_curr;
     float time_boot_sec;
     float fly_alt = 5;
     bool req_mis;
-    bool mission_valid = false;
     bool armed = false;
     std::vector<std::tuple<float, float, float>> waypoints;
 
