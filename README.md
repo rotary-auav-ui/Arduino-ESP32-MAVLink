@@ -23,13 +23,14 @@ Include the [mavlink_commands](https://github.com/rotary-auav-ui/ESP32-MAVLink/b
 #include <mavlink_commands.hpp>
 ```
 
-Create a `MAVLink` object or choose any name you like. Recommended to be in the global scope in the form of a shared pointer. Example :
+Create a `MAVLink` object or choose any name you like. Recommended to be in the global scope in the form of a shared pointer. For debugging purposes, serial 0 communication can be started so the output can be seen in the serial monitor. Example :
 ```
 #include <mavlink_commands.hpp>
 
 std::shared_ptr<MAVLink> mavlink;
 
 void setup(){
+    Serial.begin(115200);
     mavlink = std::make_shared<MAVLink>(57600, 16, 17);
 }
 ```
@@ -64,5 +65,41 @@ mavlink->start_mission();
 
 The drone will arm itself and change mode to AUTO. The drone will then fly to the first waypoint. Once the drone reaches the first waypoint, it will fly to the next waypoint and so on. Once the drone reaches the last waypoint, it will return to home position and land.
 
-### More detailed explanation on how the communication works can be found [here](https://mavlink.io/)
+### More detailed explanation on the communication and mission protocol can be found in the [official mavlink documentation](https://mavlink.io/)
+
+The function read_data() should be called in the loop() function, as it needs to constantly check if RX pin has available data from the FMU. Example :
+```
+void loop(){
+    mavlink->read_data();
+}
+```
+
+The function send_heartbeat() should also be called once every second. The library [Task Scheduler](https://github.com/arkhipenko/TaskScheduler) is used to schedule the function to be called once every second. Example :
+```
+#include <TaskScheduler.h>
+#include <mavlink_commands.hpp>
+
+Scheduler taskScheduler;
+
+std::shared_ptr<Task> heartbeat_task;
+std::shared_ptr<MAVLink> mavlink;
+
+void heartbeat_task_callback(){
+    mavlink->send_heartbeat();
+}
+
+void setup(){
+    mavlink = std::make_shared<MAVLink>(57600, 16, 17);
+
+    heartbeat_task = std::make_shared<Task>(TASK_SECOND, TASK_FOREVER, &heartbeat_task_callback);
+    taskScheduler.addTask(*heartbeat_task);
+    heartbeat_task->enable();
+}
+
+void loop(){
+    mavlink->read_data();
+    taskScheduler.execute();
+}
+```
+
 
